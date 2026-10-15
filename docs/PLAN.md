@@ -75,6 +75,12 @@ hand's averaged recent velocity × gain.
 - **Playback:** recorded sessions (`/public/sessions/*.json`) loop as a demo fallback.
 - **Record:** in camera mode, `R` records to a downloadable JSON.
 
+## Status
+
+All five milestones are built and checked in a browser (see the README's "What's verified").
+Measured along the way: tracker ~30 fps / ~20 ms on GPU from a real clip; tools pressed 5 cm into the
+practice pad overlap it by under 0.05 mm; render 60 fps on an Apple-silicon MacBook.
+
 ## Milestones (each ends with a browser check)
 
 1. **M1** Tracker, simulated hand, debug overlay. Check: simulated hand moves and changes gesture; fake camera
