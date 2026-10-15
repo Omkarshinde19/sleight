@@ -3,6 +3,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   timeout: 60_000,
+  // Physics advances per rendered frame; several GPU-heavy pages at once slow each other down.
+  workers: 1,
   use: {
     baseURL: "http://localhost:3000",
     viewport: { width: 1280, height: 800 },
