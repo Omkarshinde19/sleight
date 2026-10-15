@@ -15,6 +15,7 @@ import styles from "../hud/hud.module.css";
 import { HandTrackingProvider, isTouchDevice, useTracking } from "../tracking/HandTrackingProvider";
 import { ExposeThree } from "./ExposeThree";
 import { Studio } from "./Studio";
+import { Weather } from "../weather/Weather";
 
 export interface SceneShellProps {
   title: string;
@@ -81,6 +82,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
       >
         <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(isTouchDevice() ? 1.5 : 2)} />
         <Studio />
+        <Weather />
         <Suspense fallback={null}>
           <Physics gravity={[0, -9.81, 0]} timeStep={1 / 90} interpolate {...physics}>
             {children}
