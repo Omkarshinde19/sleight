@@ -7,7 +7,7 @@ import { SceneShell } from "@/components/scene/SceneShell";
 /** M1 test bench: the hands, a floor and a few blocks. */
 export default function LabScene() {
   return (
-    <SceneShell title="Lab" brief="A bare bench for checking tracking: move, pinch, make a fist, point." demo="/sessions/demo.json">
+    <SceneShell debug title="Lab" brief="A bare bench for checking tracking: move, pinch, make a fist, point." demo="/sessions/demo.json">
       <Floor />
       {[-0.4, 0, 0.4].map((x, i) => (
         <RigidBody key={i} position={[x, 0.08, -0.3]} colliders="cuboid">
