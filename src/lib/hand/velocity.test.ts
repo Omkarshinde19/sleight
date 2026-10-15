@@ -65,3 +65,25 @@ describe("throwVelocity", () => {
     expect(v.y).toBeLessThan(2.4);
   });
 });
+
+describe("throwVelocity with lookback", () => {
+  it("finds the swing even when release is detected after the hand has stopped", () => {
+    const h = new MotionHistory();
+    // 6 frames swinging at 2 m/s up, then 4 frames held still (gesture latency)
+    let y = 0;
+    for (let i = 0; i < 6; i++) h.push({ x: 0, y: (y = i * (2 / 30)), z: 0 }, i / 30);
+    for (let i = 6; i < 10; i++) h.push({ x: 0, y, z: 0 }, i / 30);
+    const naive = throwVelocity(h, { windowSec: 0.1, gain: 1, maxSpeed: 100 });
+    const peak = throwVelocity(h, { windowSec: 0.1, lookbackSec: 0.35, gain: 1, maxSpeed: 100 });
+    expect(Math.abs(naive.y)).toBeLessThan(1);
+    expect(peak.y).toBeCloseTo(2, 1);
+  });
+
+  it("ignores motion older than the lookback", () => {
+    const h = new MotionHistory();
+    for (let i = 0; i < 6; i++) h.push({ x: i * 0.1, y: 0, z: 0 }, i / 30); // fast, long ago
+    for (let i = 6; i < 22; i++) h.push({ x: 0.5, y: 0, z: 0 }, i / 30); // then 0.5 s still
+    const v = throwVelocity(h, { windowSec: 0.1, lookbackSec: 0.3, gain: 1, maxSpeed: 100 });
+    expect(Math.hypot(v.x, v.y, v.z)).toBeLessThan(0.05);
+  });
+});
