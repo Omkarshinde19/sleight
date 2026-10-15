@@ -9,7 +9,7 @@ interface Sample {
 export class MotionHistory {
   private samples: Sample[] = [];
 
-  constructor(private capacity = 12) {}
+  constructor(private capacity = 24) {}
 
   push(p: Point, tSec: number) {
     const last = this.samples[this.samples.length - 1];
@@ -68,19 +68,44 @@ export function regressionVelocity(samples: Sample[]): Point {
 }
 
 export interface ThrowOptions {
-  /** How far back to look, seconds. */
+  /** Length of the averaging window, seconds. */
   windowSec: number;
+  /**
+   * How far before the release to search for the fastest window. Releases are detected a few frames
+   * after the fingers open (gesture dwell + smoothing), by which time the hand has often slowed.
+   */
+  lookbackSec?: number;
   /** Scene-velocity multiplier: hand speeds are small, a basketball throw is not. */
   gain: number | Point;
   /** Cap on the result's magnitude (units / s). */
   maxSpeed: number;
 }
 
-export const DEFAULT_THROW: ThrowOptions = { windowSec: 0.12, gain: { x: 1.6, y: 1.9, z: 2.4 }, maxSpeed: 14 };
+export const DEFAULT_THROW: ThrowOptions = { windowSec: 0.12, lookbackSec: 0.35, gain: { x: 1.6, y: 1.9, z: 2.4 }, maxSpeed: 14 };
 
-/** Velocity handed to a released object: recent average hand velocity × gain, capped. */
+/** The fastest `windowSec`-long regression velocity among the samples (sliding window). */
+export function peakVelocity(samples: Sample[], windowSec: number): Point {
+  let best = regressionVelocity(samples.filter((s) => samples[samples.length - 1].t - s.t <= windowSec + 1e-9));
+  let bestSpeed = Math.hypot(best.x, best.y, best.z);
+  for (let end = samples.length - 2; end >= 1; end--) {
+    const tEnd = samples[end].t;
+    const win = samples.filter((s) => s.t <= tEnd && tEnd - s.t <= windowSec + 1e-9);
+    if (win.length < 2) continue;
+    const v = regressionVelocity(win);
+    const speed = Math.hypot(v.x, v.y, v.z);
+    if (speed > bestSpeed) {
+      best = v;
+      bestSpeed = speed;
+    }
+  }
+  return best;
+}
+
+/** Velocity handed to a released object: recent (peak) average hand velocity × gain, capped. */
 export function throwVelocity(history: MotionHistory, opts: ThrowOptions = DEFAULT_THROW): Point {
-  const v = regressionVelocity(history.recent(opts.windowSec));
+  const samples = history.recent(Math.max(opts.windowSec, opts.lookbackSec ?? 0));
+  if (samples.length < 2) return { x: 0, y: 0, z: 0 };
+  const v = opts.lookbackSec ? peakVelocity(samples, opts.windowSec) : regressionVelocity(history.recent(opts.windowSec));
   const g = typeof opts.gain === "number" ? { x: opts.gain, y: opts.gain, z: opts.gain } : opts.gain;
   const out = { x: v.x * g.x, y: v.y * g.y, z: v.z * g.z };
   const speed = Math.hypot(out.x, out.y, out.z);
