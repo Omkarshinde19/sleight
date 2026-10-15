@@ -28,6 +28,8 @@ export interface SceneShellProps {
   camera?: { position: [number, number, number]; fov?: number; lookAt?: [number, number, number] };
   /** Recording that plays in demo mode. */
   demo: string;
+  /** Start with the debug overlay open (also ?debug in the URL). */
+  debug?: boolean;
 }
 
 export function SceneShell(props: SceneShellProps) {
@@ -39,7 +41,7 @@ export function SceneShell(props: SceneShellProps) {
   );
 }
 
-function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
+function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
   const [dpr, setDpr] = useState(1.5);
   const tracking = useTracking();
   const source = useHandStore((s) => s.source);
@@ -47,7 +49,9 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
 
   // ?source=sim|camera|demo starts straight away (used for demos and automated checks).
   useEffect(() => {
-    const want = new URLSearchParams(window.location.search).get("source");
+    const params = new URLSearchParams(window.location.search);
+    useHandStore.setState({ debug: !!debug || params.has("debug") });
+    const want = params.get("source");
     if (want === "sim") tracking.startSim();
     else if (want === "demo") tracking.startPlayback(demo);
     else if (want === "camera") tracking.startCamera();

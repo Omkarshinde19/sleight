@@ -33,7 +33,7 @@ export const useHandStore = create<HandStore>((set) => ({
   holding: {},
   recording: false,
   calibrating: false,
-  debug: true,
+  debug: false,
   set: (patch) => set(patch),
 }));
 
