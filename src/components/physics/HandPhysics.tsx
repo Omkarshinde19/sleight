@@ -23,8 +23,10 @@ export interface Grabbable {
   body: () => RapierRigidBody | null;
   /** Gestures that can pick this up. */
   gestures: Gesture[];
-  /** How close the grip point must be to the body's centre, metres. */
+  /** How close the grip point must be to the body's centre (or `grabPoint`), metres. */
   reach: number;
+  /** Where to measure reach from, if not the body's centre (e.g. a lever's knob). */
+  grabPoint?: () => Point;
   /** Fixed (rigid) attachment, or a spring that lets the object lag and resist (levers). */
   attach?: "fixed" | { stiffness: number; damping: number };
   /** For spring attachments: the grab point on the body, in its local frame. */
@@ -33,6 +35,8 @@ export interface Grabbable {
   throwable?: ThrowOptions | false;
   /** Keep the default HELD collision group while attached? (off for levers fixed in place). */
   switchGroups?: boolean;
+  /** Checked every step while held; true makes the hand let go (e.g. a chip clicking into its socket). */
+  shouldRelease?: () => boolean;
   onGrab?: (hand: Handedness) => void;
   /** May return a new velocity (e.g. aim assist). */
   onRelease?: (info: ReleaseInfo) => Point | void;
@@ -176,20 +180,26 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     for (const hand of ["Right", "Left"] as Handedness[]) {
       const rt = hands.current[hand];
       const h = tracked[hand];
+      const bodies = [rt.palm, ...rt.tips, rt.anchor];
       if (!h) {
         if (rt.held) release(hand, rt, false);
         rt.prevGesture = "none";
-        [rt.palm, ...rt.tips, rt.anchor].forEach((b) => b?.setNextKinematicTranslation(PARKED));
+        // Teleport (not a kinematic move): sweeping to the parking spot in one step would
+        // smash anything in between, since kinematic bodies with CCD push at any speed.
+        if (rt.pos[0].y > -40) bodies.forEach((b) => b?.setTranslation(PARKED, false));
         rt.pos.forEach((p) => p.set(PARKED.x, PARKED.y, PARKED.z));
         continue;
       }
 
-      // Smoothly follow the tracked joints. Snap if the hand just appeared.
+      // Smoothly follow the tracked joints. A hand that just appeared is teleported in, for the same reason.
       const targets = [h.palm, ...TIPS.map((i) => h.joints[i]), h.grip];
+      const appeared = rt.pos[0].y < -40;
       rt.pos.forEach((p, i) => {
         const t = targets[i];
-        if (p.y < -40) p.set(t.x, t.y, t.z);
-        else p.lerp(vA.set(t.x, t.y, t.z), k);
+        if (appeared) {
+          p.set(t.x, t.y, t.z);
+          bodies[i]?.setTranslation(p, false);
+        } else p.lerp(vA.set(t.x, t.y, t.z), k);
       });
       rt.rot.slerp(palmQuaternion(h.joints, qTmp), k);
       rt.palm?.setNextKinematicTranslation(rt.pos[0]);
@@ -203,7 +213,8 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       if (isGrabGesture(g) && !isGrabGesture(rt.prevGesture)) rt.grabWindowUntil = now + GRAB_GRACE;
       rt.prevGesture = g;
 
-      if (rt.held && !rt.held.item.gestures.includes(g)) release(hand, rt, true);
+      if (rt.held && rt.held.item.shouldRelease?.()) release(hand, rt, false);
+      else if (rt.held && !rt.held.item.gestures.includes(g)) release(hand, rt, true);
       else if (!rt.held && isGrabGesture(g) && now <= rt.grabWindowUntil) {
         const other = hands.current[hand === "Right" ? "Left" : "Right"];
         let best: Grabbable | null = null;
@@ -212,7 +223,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
           if (!item.gestures.includes(g) || other.held?.item.id === item.id) continue;
           const b = item.body();
           if (!b) continue;
-          const p = b.translation();
+          const p = item.grabPoint?.() ?? b.translation();
           const d = Math.hypot(p.x - h.grip.x, p.y - h.grip.y, p.z - h.grip.z);
           if (d < item.reach && d < bestD) {
             best = item;
