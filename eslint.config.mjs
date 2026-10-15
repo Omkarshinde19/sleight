@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored MediaPipe WASM glue copied in by scripts/copy-mediapipe.mjs.
+    "public/mediapipe/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 
