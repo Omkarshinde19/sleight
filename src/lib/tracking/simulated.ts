@@ -1,5 +1,6 @@
 import { lerpPose, POSES, synthHand, type HandPose, type Orientation } from "../hand/synth";
-import { clamp, type Gesture, type Handedness, type RawFrame } from "../hand/types";
+import type { Workspace } from "../hand/mapping";
+import { clamp, type Gesture, type Handedness, type Point, type RawFrame } from "../hand/types";
 import type { TrackingSource } from "./source";
 
 type PoseName = Exclude<Gesture, "none">;
@@ -113,6 +114,18 @@ export class SimulatedSource implements TrackingSource {
     Object.assign(this.hands[hand], patch);
   }
 
+  /**
+   * Move a hand so its palm lands on a scene point: the inverse of the scene mapping, assuming depth
+   * was calibrated at the starting distance (0.5 m). Used by tests and the demo autopilot.
+   */
+  reach(hand: Handedness, p: Point, ws: Workspace, calibratedDistance = 0.5) {
+    const h = this.hands[hand];
+    h.visible = true;
+    h.imageX = clamp(0.5 - (p.x - ws.center.x) / ws.width, 0.02, 0.98);
+    h.imageY = clamp(0.5 - (p.y - ws.center.y) / ws.height, 0.02, 0.98);
+    h.distance = clamp(calibratedDistance * (1 + (p.z - ws.center.z) / ws.depthGain), NEAR, FAR);
+  }
+
   /** Play a scripted motion, e.g. a throw. */
   play(hand: Handedness, keys: MotionKey[]) {
     this.scripts = this.scripts.filter((s) => s.hand !== hand);
@@ -123,10 +136,11 @@ export class SimulatedSource implements TrackingSource {
   throwFlick(hand: Handedness = this.active) {
     this.play(hand, [
       { at: 0, gesture: "fist" },
-      { at: 0.25, dy: 0.12, dDistance: 0.12, gesture: "fist" },
-      { at: 0.5, dy: -0.18, dDistance: -0.22, gesture: "fist" },
-      { at: 0.52, dy: -0.19, dDistance: -0.23, gesture: "open" },
-      { at: 0.9, dy: -0.19, dDistance: -0.23, gesture: "open" },
+      { at: 0.25, dy: 0.1, dDistance: 0.1, gesture: "fist" },
+      // swing forward and up, opening the hand on the way (follow-through continues)
+      { at: 0.45, dy: -0.26, dDistance: -0.1, gesture: "open" },
+      { at: 0.6, dy: -0.44, dDistance: -0.17, gesture: "open" },
+      { at: 0.9, dy: -0.46, dDistance: -0.18, gesture: "open" },
     ]);
   }
 

@@ -20,6 +20,7 @@ interface TrackingApi {
   /** The simulated source while it's active (scripted moves, tests). */
   sim: SimulatedSource | null;
   video: HTMLVideoElement | null;
+  workspace: Workspace;
 }
 
 const TrackingContext = createContext<TrackingApi | null>(null);
@@ -126,6 +127,7 @@ export function HandTrackingProvider({
       },
       sim,
       video,
+      workspace: processor.workspace,
     }),
     [run, stop, processor, recorder, sim, video, surface],
   );
