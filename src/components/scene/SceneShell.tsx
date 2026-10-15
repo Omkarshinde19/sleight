@@ -2,7 +2,7 @@
 
 import { PerformanceMonitor } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Physics } from "@react-three/rapier";
+import { Physics, type PhysicsProps } from "@react-three/rapier";
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { DEFAULT_WORKSPACE, type Workspace } from "@/lib/hand/mapping";
@@ -30,6 +30,8 @@ export interface SceneShellProps {
   demo: string;
   /** Start with the debug overlay open (also ?debug in the URL). */
   debug?: boolean;
+  /** Solver tuning for this scene. */
+  physics?: Partial<PhysicsProps>;
 }
 
 export function SceneShell(props: SceneShellProps) {
@@ -41,7 +43,7 @@ export function SceneShell(props: SceneShellProps) {
   );
 }
 
-function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
+function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, physics, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
   const [dpr, setDpr] = useState(1.5);
   const tracking = useTracking();
   const source = useHandStore((s) => s.source);
@@ -80,7 +82,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
         <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(isTouchDevice() ? 1.5 : 2)} />
         <Studio />
         <Suspense fallback={null}>
-          <Physics gravity={[0, -9.81, 0]} timeStep={1 / 90} interpolate>
+          <Physics gravity={[0, -9.81, 0]} timeStep={1 / 90} interpolate {...physics}>
             {children}
             <ExposeThree />
           </Physics>
