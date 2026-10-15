@@ -106,6 +106,10 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
       </p>
 
       {hud}
+      <div className={styles.rotate} role="note">
+        <span aria-hidden>⤾</span>
+        Turn your phone sideways — the scenes are made for landscape.
+      </div>
       <DebugOverlay />
       {(!source || status === "denied" || status === "error") && <SourceChooser title={title} brief={brief} demo={demo} />}
     </div>
