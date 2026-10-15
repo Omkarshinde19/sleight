@@ -1,0 +1,257 @@
+.sceneRoot {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 0%, #161a3a 0%, #07080c 60%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sceneRoot canvas {
+  display: block;
+}
+
+.topBar {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  min-height: 40px;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+  line-height: 1;
+}
+
+.dim {
+  color: var(--bone-faint);
+}
+
+.warn {
+  color: #ffb36b;
+}
+
+.controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 5px;
+}
+
+.controls button {
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  color: var(--bone-dim);
+  transition: background 0.2s, color 0.2s;
+}
+
+.controls button:hover,
+.controls button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--bone);
+}
+
+.controls .rec {
+  color: #ff6b5b !important;
+}
+
+.status {
+  padding: 0 10px 0 12px;
+  color: var(--cyan);
+}
+
+.status[data-status="loading"] {
+  color: #ffb36b;
+}
+
+.privacy {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bone-faint);
+  font-size: 10px;
+  z-index: 4;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6dffb0;
+  box-shadow: 0 0 10px #6dffb0;
+}
+
+.debug {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: 38px;
+  padding: 8px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.debugCanvas {
+  width: 240px;
+  height: 180px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.debugStats {
+  font-size: 10px;
+  line-height: 1.6;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--bone-dim);
+  white-space: nowrap;
+}
+
+.help {
+  position: absolute;
+  top: 64px;
+  right: 0;
+  padding: 14px 16px;
+  font-size: 11px;
+  line-height: 2;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.help kbd {
+  font-family: inherit;
+  padding: 1px 6px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 6px;
+  color: var(--bone);
+}
+
+.chooserWrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 6, 10, 0.45);
+  z-index: 10;
+}
+
+.chooser {
+  width: min(560px, 100%);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+
+.chooserTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(36px, 6vw, 56px);
+  line-height: 1;
+}
+
+.chooserBrief {
+  color: var(--bone-dim);
+  line-height: 1.5;
+}
+
+.notice {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(226, 85, 58, 0.18);
+  border: 1px solid rgba(226, 85, 58, 0.5);
+  font-size: 14px;
+}
+
+.choices {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  text-align: left;
+  border: 1px solid var(--glass-edge);
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.choice:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.choice span {
+  font-size: 13px;
+  color: var(--bone-dim);
+}
+
+.primary {
+  background: linear-gradient(120deg, rgba(106, 75, 196, 0.55), rgba(226, 85, 58, 0.45));
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.primary:hover {
+  background: linear-gradient(120deg, rgba(106, 75, 196, 0.7), rgba(226, 85, 58, 0.6));
+}
+
+/* Phones in landscape: shrink the chrome so the scene gets the screen. */
+@media (max-height: 500px) {
+  .debugCanvas {
+    width: 160px;
+    height: 120px;
+  }
+  .debug {
+    bottom: 30px;
+  }
+  .chooser {
+    padding: 18px;
+  }
+  .choices {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .controls button {
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+}
