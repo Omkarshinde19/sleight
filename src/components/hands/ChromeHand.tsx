@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { FINGERS, LM, type Handedness, type Point } from "@/lib/hand/types";
+import { makeChromeMaterial } from "@/lib/materials/chrome";
 import { handStore } from "@/state/handStore";
 
 // Radii in real-hand metres; multiplied by the workspace hand scale.
@@ -23,19 +24,6 @@ const FINGER_BONES: [number, number][] = FINGERS.flatMap((chain) =>
   chain.slice(1).map((j, i) => [chain[i], j] as [number, number]),
 );
 
-export function makeChromeMaterial(tint = "#eef1f7") {
-  return new THREE.MeshPhysicalMaterial({
-    color: tint,
-    metalness: 1,
-    roughness: 0.09,
-    iridescence: 0.9,
-    iridescenceIOR: 1.7,
-    iridescenceThicknessRange: [180, 620],
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.06,
-    envMapIntensity: 1.6,
-  });
-}
 
 const v = new THREE.Vector3();
 const v2 = new THREE.Vector3();

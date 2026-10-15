@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import { useHandStore } from "@/state/handStore";
+import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { useTracking } from "../tracking/HandTrackingProvider";
 import styles from "./hud.module.css";
+
+const NEXT_WEATHER: Record<WeatherKind, WeatherKind> = { clear: "rain", rain: "snow", snow: "clear" };
+const WEATHER_LABEL: Record<WeatherKind, string> = { clear: "☀ Clear", rain: "☂ Rain", snow: "❄ Snow" };
 
 const SOURCE_LABEL = { camera: "Camera", sim: "Simulated", playback: "Recording" } as const;
 
@@ -14,6 +18,8 @@ export function SceneControls({ demo }: { demo: string }) {
   const recording = useHandStore((s) => s.recording);
   const debug = useHandStore((s) => s.debug);
   const [help, setHelp] = useState(false);
+  const weather = useWeather((s) => s.kind);
+  const setWeather = useWeather((s) => s.setKind);
 
   return (
     <>
@@ -35,6 +41,9 @@ export function SceneControls({ demo }: { demo: string }) {
           </>
         )}
         {source === "sim" && <button onClick={() => setHelp((h) => !h)} aria-expanded={help}>Keys</button>}
+        <button onClick={() => setWeather(NEXT_WEATHER[weather])} title="Rain wets the hands (they dry when it stops); snow settles on them" data-testid="weather">
+          {WEATHER_LABEL[weather]}
+        </button>
         <button onClick={() => useHandStore.setState({ debug: !debug })} aria-pressed={debug}>Debug</button>
       </nav>
       {help && source === "sim" && (
