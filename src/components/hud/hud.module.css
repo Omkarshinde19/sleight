@@ -255,3 +255,32 @@
     font-size: 12px;
   }
 }
+
+.rotate {
+  display: none;
+}
+
+/* phones held upright: scenes need landscape */
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 32px;
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1.2;
+    background: rgba(7, 8, 12, 0.88);
+    backdrop-filter: blur(10px);
+  }
+  .rotate span {
+    font-size: 56px;
+    color: var(--cyan);
+  }
+}
