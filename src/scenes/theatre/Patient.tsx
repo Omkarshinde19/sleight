@@ -36,6 +36,51 @@ function DottedGuide() {
   );
 }
 
+/** Surgical drape: a teal sheet over the torso with windows for the pad and the wound, and skirts. */
+function Drape() {
+  const top = useMemo(() => {
+    const w = TORSO.half[0] + TORSO.radius + 0.03;
+    const d = TORSO.half[2] + TORSO.radius + 0.03;
+    const shape = new THREE.Shape();
+    shape.moveTo(-w, -d);
+    shape.lineTo(w, -d);
+    shape.lineTo(w, d);
+    shape.lineTo(-w, d);
+    shape.closePath();
+    // shape space is (x, -z) after the -90° rotation below
+    const pad = new THREE.Path();
+    const px = PAD.x - TORSO.x;
+    const pz = -(PAD.z - TORSO.z);
+    pad.moveTo(px - PAD.half[0] - 0.01, pz - PAD.half[2] - 0.01);
+    pad.lineTo(px + PAD.half[0] + 0.01, pz - PAD.half[2] - 0.01);
+    pad.lineTo(px + PAD.half[0] + 0.01, pz + PAD.half[2] + 0.01);
+    pad.lineTo(px - PAD.half[0] - 0.01, pz + PAD.half[2] + 0.01);
+    pad.closePath();
+    const wound = new THREE.Path();
+    wound.absarc(WOUND.x - TORSO.x, -(WOUND.z - TORSO.z), WOUND.radius + 0.022, 0, Math.PI * 2, true);
+    shape.holes.push(pad, wound);
+    return new THREE.ShapeGeometry(shape, 24);
+  }, []);
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#17505d", roughness: 0.92, side: THREE.DoubleSide }), []);
+  const w = TORSO.half[0] + TORSO.radius + 0.03;
+  const d = TORSO.half[2] + TORSO.radius + 0.03;
+  const skirt = TORSO_TOP - TABLE_TOP;
+  return (
+    <group position={[TORSO.x, 0, TORSO.z]}>
+      <mesh geometry={top} material={mat} rotation-x={-Math.PI / 2} position={[0, TORSO_TOP + 0.003, 0]} receiveShadow />
+      {[
+        { p: [0, TABLE_TOP + skirt / 2, d] as const, r: 0, s: [w * 2, skirt] as const },
+        { p: [0, TABLE_TOP + skirt / 2, -d] as const, r: 0, s: [w * 2, skirt] as const },
+        { p: [w, TABLE_TOP + skirt / 2, 0] as const, r: Math.PI / 2, s: [d * 2, skirt] as const },
+      ].map((k, i) => (
+        <mesh key={i} material={mat} position={[k.p[0], k.p[1], k.p[2]]} rotation-y={k.r} receiveShadow>
+          <planeGeometry args={[k.s[0], k.s[1]]} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export function Patient() {
   const body = useRef<RapierRigidBody>(null);
   const skin = useMemo(() => skinMaterial(), []);
@@ -91,6 +136,7 @@ export function Patient() {
           <meshPhysicalMaterial color="#e7b8ad" roughness={0.6} sheen={0.8} sheenColor="#ffc9b9" />
         </mesh>
         <DottedGuide />
+        <Drape />
         <mesh position={[WOUND.x, TORSO_TOP + 0.006, WOUND.z]} rotation-x={Math.PI / 2} castShadow>
           <torusGeometry args={[WOUND.radius, 0.012, 16, 48]} />
           <meshPhysicalMaterial color="#d79a8e" roughness={0.5} sheen={0.6} />
