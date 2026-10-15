@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyInstant, GestureClassifier, handFeatures } from "./gestures";
+import { classifyInstant, GestureClassifier, handFeatures, THRESHOLDS } from "./gestures";
 import { lerpPose, POSES, synthHand, type HandPose } from "./synth";
 import type { Gesture, Handedness } from "./types";
 
@@ -42,11 +42,21 @@ describe("classifyInstant", () => {
   }
 
   it("holds a pinch while the fingers drift apart a little (hysteresis)", () => {
-    // ~40% of the way from pinch to open: past the enter threshold but inside the exit threshold
-    const loose = handFeatures(world(lerpPose(POSES.pinch, POSES.open, 0.3)));
+    // Find a pose part-way from pinch to open whose pinch distance sits between enter and exit.
+    const { enter, exit } = THRESHOLDS.pinch;
+    const loose = Array.from({ length: 41 }, (_, i) => handFeatures(world(lerpPose(POSES.pinch, POSES.open, i / 40)))).find(
+      (f) => f.pinchDistance > enter && f.pinchDistance < exit,
+    )!;
+    expect(loose).toBeDefined();
     expect(classifyInstant(loose, "none")).not.toBe("pinch");
     expect(classifyInstant(loose, "pinch")).toBe("pinch");
   });
+});
+
+it("drops to none for an in-between claw instead of sticking to open", () => {
+  const claw = handFeatures(world(lerpPose(POSES.open, POSES.fist, 0.6)));
+  expect(claw.grip).toBeGreaterThan(THRESHOLDS.open.gripExit);
+  expect(classifyInstant(claw, "open")).not.toBe("open");
 });
 
 describe("GestureClassifier", () => {

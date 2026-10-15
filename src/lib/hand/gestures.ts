@@ -47,10 +47,10 @@ export function handFeatures(world: Point[]): HandFeatures {
 
 /**
  * Thresholds. Each gesture has an `enter` and a looser `exit` value, so a hand sitting near a boundary
- * doesn't flip back and forth (hysteresis). Tuned on recorded webcam sessions in src/lib/hand/__fixtures__.
+ * doesn't flip back and forth (hysteresis). Checked against real webcam landmarks in src/lib/hand/__fixtures__.
  */
 export const THRESHOLDS = {
-  pinch: { enter: 0.3, exit: 0.45 },
+  pinch: { enter: 0.34, exit: 0.5 },
   /** Pinch is only a pinch if the index is not folded right into a fist. */
   pinchMaxIndexCurl: 0.8,
   fist: { enter: 0.68, exit: 0.52 },
@@ -77,7 +77,9 @@ export function classifyInstant(f: HandFeatures, current: Gesture = "none"): Ges
   const openLimit = current === "open" ? T.open.gripExit : T.open.gripMax;
   if (f.grip < openLimit) return "open";
 
-  return current === "none" ? "none" : current;
+  // In between (a loose claw, a hand turning): no gesture. Exit thresholds above already gave the
+  // current gesture its slack, so holding on any longer would make it sticky.
+  return "none";
 }
 
 /**
