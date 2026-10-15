@@ -8,7 +8,7 @@ const eslintConfig = defineConfig([
   {
     // Physics and scene code keeps per-frame runtime state (rigid bodies, trails, hand followers)
     // outside React and mutates it from useFrame/physics callbacks on purpose.
-    files: ["src/components/physics/**", "src/scenes/**"],
+    files: ["src/components/physics/**", "src/scenes/**", "src/components/landing/LandingStage.tsx"],
     rules: { "react-hooks/refs": "off", "react-hooks/immutability": "off" },
   },
   // Override default ignores of eslint-config-next.
