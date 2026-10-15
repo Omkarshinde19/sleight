@@ -27,8 +27,15 @@ export interface Grabbable {
   reach: number;
   /** Where to measure reach from, if not the body's centre (e.g. a lever's knob). */
   grabPoint?: () => Point;
-  /** Fixed (rigid) attachment, or a spring that lets the object lag and resist (levers). */
-  attach?: "fixed" | { stiffness: number; damping: number };
+  /**
+   * - "fixed": rigid joint to the hand.
+   * - spring: lets the object lag and resist (levers).
+   * - "drive": no joint; the object's velocity is steered toward the hand every step, so contacts
+   *   (with CCD) stop it at whatever it hits. Used for surgical tools that must never clip.
+   */
+  attach?: "fixed" | "drive" | { stiffness: number; damping: number };
+  /** Gestures that keep holding once picked up (default: `gestures`). */
+  holdGestures?: Gesture[];
   /** For spring attachments: the grab point on the body, in its local frame. */
   localHandle?: Point;
   /** Give the object the hand's velocity on release. */
@@ -78,8 +85,11 @@ interface HandRuntime {
   rot: THREE.Quaternion;
   prevGesture: Gesture;
   grabWindowUntil: number;
-  held: { item: Grabbable; joint: ImpulseJoint } | null;
+  held: { item: Grabbable; joint: ImpulseJoint | null; drive?: { offset: THREE.Vector3; rot: THREE.Quaternion } } | null;
 }
+
+/** Where each driven (tool) item is being steered to: what the hand wants, before contacts. */
+export const driveTargets = new Map<string, { position: THREE.Vector3; quaternion: THREE.Quaternion }>();
 
 const newRuntime = (): HandRuntime => ({
   palm: null,
@@ -92,7 +102,14 @@ const newRuntime = (): HandRuntime => ({
   held: null,
 });
 
+/** Tool steering: time constant and speed limits. */
+const DRIVE_TAU = 0.03;
+const DRIVE_MAX_SPEED = 1.6;
+const DRIVE_MAX_SPIN = 14;
+
 const basis = new THREE.Matrix4();
+const qDrive = new THREE.Quaternion();
+const qTmp2 = new THREE.Quaternion();
 const qTmp = new THREE.Quaternion();
 const vA = new THREE.Vector3();
 const vB = new THREE.Vector3();
@@ -122,8 +139,10 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     if (!rt.held) return;
     const { item, joint } = rt.held;
     rt.held = null;
-    if (world.getImpulseJoint(joint.handle)) world.removeImpulseJoint(joint, true);
+    if (joint && world.getImpulseJoint(joint.handle)) world.removeImpulseJoint(joint, true);
+    driveTargets.delete(item.id);
     const body = item.body();
+    if (item.attach === "drive") body?.setGravityScale(1, true);
     const tracked = handStore.getState().hands[hand];
     let velocity: Point = { x: 0, y: 0, z: 0 };
     if (throwIt && item.throwable && tracked) velocity = throwVelocity(tracked.history, item.throwable);
@@ -147,6 +166,18 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     if (!body || !anchor) return;
     const a = anchor.translation();
     const inv = qTmp.copy(rt.rot).invert();
+    if (item.attach === "drive") {
+      // Steered from the palm, which (unlike the grip point) doesn't jump between pinch and fist.
+      const o = body.translation();
+      const r = body.rotation();
+      const offset = new THREE.Vector3(o.x - rt.pos[0].x, o.y - rt.pos[0].y, o.z - rt.pos[0].z).applyQuaternion(inv);
+      const rot = inv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w));
+      body.setGravityScale(0, true);
+      rt.held = { item, joint: null, drive: { offset, rot } };
+      item.onGrab?.(hand);
+      handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
+      return;
+    }
     let params;
     if (item.attach && item.attach !== "fixed") {
       const local = item.localHandle ?? { x: 0, y: 0, z: 0 };
@@ -169,6 +200,33 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     rt.held = { item, joint };
     item.onGrab?.(hand);
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
+  };
+
+  /** Velocity steering toward the hand's pose: a critically damped follow that contacts can stop. */
+  const drive = (rt: HandRuntime, item: Grabbable, d: { offset: THREE.Vector3; rot: THREE.Quaternion }, dt: number) => {
+    const body = item.body();
+    if (!body) return;
+    const target = driveTargets.get(item.id) ?? { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
+    target.position.copy(d.offset).applyQuaternion(rt.rot).add(rt.pos[0]);
+    target.quaternion.copy(rt.rot).multiply(d.rot);
+    driveTargets.set(item.id, target);
+
+    const p = body.translation();
+    const tau = Math.max(DRIVE_TAU, dt * 2);
+    const v = vB.set((target.position.x - p.x) / tau, (target.position.y - p.y) / tau, (target.position.z - p.z) / tau);
+    if (v.length() > DRIVE_MAX_SPEED) v.setLength(DRIVE_MAX_SPEED);
+
+    const r = body.rotation();
+    const dq = qDrive.copy(target.quaternion).multiply(qTmp2.set(r.x, r.y, r.z, r.w).invert()).normalize();
+    if (dq.w < 0) dq.set(-dq.x, -dq.y, -dq.z, -dq.w); // shortest way round
+    const angle = 2 * Math.acos(Math.min(1, dq.w));
+    // w can round to just above 1 when already aligned; a NaN here panics Rapier's WASM.
+    const s = Math.sqrt(Math.max(0, 1 - dq.w * dq.w));
+    const w = s < 1e-6 ? vC.set(0, 0, 0) : vC.set(dq.x / s, dq.y / s, dq.z / s).multiplyScalar(angle / tau);
+    if (w.length() > DRIVE_MAX_SPIN) w.setLength(DRIVE_MAX_SPIN);
+    if (![v.x, v.y, v.z, w.x, w.y, w.z].every(Number.isFinite)) return;
+    body.setLinvel(v, true);
+    body.setAngvel(w, true);
   };
 
   useBeforePhysicsStep((w) => {
@@ -214,7 +272,8 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       rt.prevGesture = g;
 
       if (rt.held && rt.held.item.shouldRelease?.()) release(hand, rt, false);
-      else if (rt.held && !rt.held.item.gestures.includes(g)) release(hand, rt, true);
+      else if (rt.held && !(rt.held.item.holdGestures ?? rt.held.item.gestures).includes(g)) release(hand, rt, true);
+      if (rt.held?.drive) drive(rt, rt.held.item, rt.held.drive, dt);
       else if (!rt.held && isGrabGesture(g) && now <= rt.grabWindowUntil) {
         const other = hands.current[hand === "Right" ? "Left" : "Right"];
         let best: Grabbable | null = null;
