@@ -65,9 +65,9 @@ export function localRightHand(pose: HandPose): Point[] {
 
   // Thumb: swings from out-and-up toward the palm as it curls.
   const cmc: Point = { x: 0.022, y: -0.026, z: -0.01 };
-  const open = norm({ x: 0.78, y: -0.6, z: -0.18 });
+  const open = norm({ x: 0.5, y: -0.82, z: -0.28 });
   const across = norm({ x: -0.55, y: -0.45, z: -0.7 });
-  const lengths = [0.036, 0.032, 0.027];
+  const lengths = [0.032, 0.03, 0.026];
   let p = cmc;
   out[LM.THUMB_CMC] = cmc;
   for (let i = 0; i < 3; i++) {
