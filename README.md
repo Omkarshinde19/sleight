@@ -14,8 +14,10 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
 
 - **Landing page.** A scroll story of the three hands, before anything asks for the camera. Chrome hands
   re-pose for each chapter, and blueprint callouts track live joint angles, pinch and grip.
-- **Arcade Room** (`/arcade`). Make a fist on a basketball, swing and open your hand. The ball leaves
-  with your hand's recent velocity: a least-squares fit over the fastest 120 ms before release. It scores
+- **Arcade Room** (`/arcade`). Cup a basketball with a half-closed hand, the way you'd really hold one. It
+  stays in your hand until your fingers open. Opening slowly drops it; a sudden flick as you open throws it
+  with your hand's recent velocity: a least-squares fit over the fastest 120 ms before release. Brushing
+  the rack can't knock balls off, and dropped or missed balls go back to their cradles. It scores
   only when it drops down through the rim. You get streaks, a hoop that starts to drift from a streak of 3,
   dashed trajectory arcs and an aim assist (off / fair / strong).
 - **Industrial Floor** (`/industrial`). A precise pinch picks up a 5 cm microchip; a fist can't. The chip
@@ -56,8 +58,9 @@ Camera access needs `localhost` or HTTPS. To try it on a phone, use the deployed
    - Hold your hand up about 50 cm from the camera for a second. Depth calibrates on the first frames
      (**Calibrate** redoes it).
    - Good light from the front works best. A bright window behind you makes tracking harder.
-3. **Arcade:** move your hand over the rack, make a fist on a ball, swing forward *and up*, open your hand.
-   Aim assist defaults to *strong*; the HUD button cycles it.
+3. **Arcade:** bring your hand onto a ball and close it halfway, like holding a real basketball. Flick
+   forward *and up* and open your fingers to shoot. Open slowly and it just drops back to the rack. Aim
+   assist defaults to *strong*; the HUD button cycles it.
 4. **Industrial:** pinch the chip (thumb to index), carry it to the socket, turn your hand until Δθ goes
    green, lower it. Then make a fist on the purple knob and pull toward you. Do the same on the orange knob.
 5. **Theatre:** pinch the scalpel and draw along the dotted line on the pad. Push down hard and watch the
@@ -69,7 +72,7 @@ Camera access needs `localhost` or HTTPS. To try it on a phone, use the deployed
 **No webcam, or the room's lighting is bad?** Every scene has two fallbacks:
 
 - **Simulated hand:** the mouse moves it, click (or Space) grabs, Shift+click pinches, the wheel or R/F
-  sets depth, 1–4 picks open / pinch / fist / point, T throws, Q/E · W/S · A/D rotate, and Tab switches
+  sets depth, 1–5 picks open / pinch / fist / point / claw, T throws, Q/E · W/S · A/D rotate, and Tab switches
   hands. **Keys** in the top bar lists them all.
 - **Demo recording:** a recorded real session plays in a loop.
 
@@ -155,6 +158,9 @@ The tracker model and WASM are cached as immutable assets (`next.config.ts`).
 - **You need to try:** a live webcam in your room's lighting; how throwing *feels* with your own arm
   (gains are in `src/scenes/arcade/Balls.tsx`); an iPhone in Safari (the layout is checked, but live
   tracking speed on the device isn't); and performance on a mid-range Windows laptop.
+- **Refreshing:** the tab remembers that it was using the camera and resumes it if permission is already
+  granted. Depth calibration is taken from steady frames only, saved, and restored after a reload. If
+  the camera is still held by the previous page, it retries a few times.
 - **Known limits:** robot hands can visually pass through furniture (only tools are physically blocked).
   Tracking is weakest with strong backlight and side-on pinches. A tool glancing the patient at full
   speed can momentarily overlap by a few mm before the solver pushes it out (shown as *max* in the
