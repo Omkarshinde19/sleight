@@ -46,7 +46,7 @@ export function ArcadeHud() {
           {flash.text}
         </div>
       )}
-      <p className={`${styles.tip} mono`}>Make a fist on a ball · swing forward and up · open your hand to release</p>
+      <p className={`${styles.tip} mono`}>Cup a ball with a half-closed hand · flick forward and up · open your fingers to shoot</p>
     </>
   );
 }

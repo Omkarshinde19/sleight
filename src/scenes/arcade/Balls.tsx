@@ -13,8 +13,15 @@ import { makeBallTexture } from "./ballTexture";
 import { hoopOffset, RIM } from "./Hoop";
 
 export const BALL_RADIUS = 0.12;
-export const RACK = { x: 0.42, y: 0.8, z: -0.25 };
-const SLOTS: Point[] = [-0.26, 0, 0.26].map((dx) => ({ x: RACK.x + dx, y: RACK.y + BALL_RADIUS + 0.03, z: RACK.z }));
+/** The rack sits dead centre, in front of the hoop. */
+export const RACK = { x: 0, y: 0.8, z: -0.28 };
+const SLOT_DX = [-0.27, 0, 0.27];
+/** Each ball sits in a cradle: a ring of small spheres it settles into, so a nudge can't roll it off. */
+const CRADLE = { ring: 0.085, bead: 0.012, height: 0.03 };
+const CRADLE_REST = CRADLE.height + Math.sqrt((BALL_RADIUS + CRADLE.bead) ** 2 - CRADLE.ring ** 2);
+const SLOTS: Point[] = SLOT_DX.map((dx) => ({ x: RACK.x + dx, y: RACK.y + CRADLE_REST + 0.004, z: RACK.z }));
+/** Hold the ball like a real basketball: a half-closed claw takes it, opening the fingers lets go. */
+const BALL_GRIP = { grab: 0.4, release: 0.28 };
 
 type BallState = "rack" | "held" | "flying" | "scored" | "loose";
 
@@ -23,10 +30,12 @@ export interface BallRuntime {
   state: BallState;
   since: number;
   trail: Point[];
+  /** When the ball was first seen away from its cradle (not held), for respawning. */
+  awaySince: number | null;
 }
 
 // Shared so the scene's sensor callback and tests can see ball state.
-export const balls: BallRuntime[] = SLOTS.map(() => ({ body: null, state: "rack", since: 0, trail: [] }));
+export const balls: BallRuntime[] = SLOTS.map(() => ({ body: null, state: "rack", since: 0, trail: [], awaySince: null }));
 
 /** Arcade throw: hand speeds are small, so scale them up; z (depth) is the weakest signal, so most gain. */
 const THROW = { windowSec: 0.12, lookbackSec: 0.35, gain: { x: 2.2, y: 2.8, z: 3.4 }, maxSpeed: 13 };
@@ -45,8 +54,11 @@ function Ball({ index, texture }: { index: number; texture: THREE.Texture }) {
     name: `BALL ${index + 1}`,
     body: () => ref.current,
     gestures: ["fist", "pinch"],
-    reach: BALL_RADIUS + 0.13,
+    grip: BALL_GRIP,
+    // measured from the palm: cradling a ball puts the palm about one radius from its centre
+    reach: BALL_RADIUS + 0.12,
     throwable: THROW,
+    restGroups: GROUPS.propNoHand,
     onGrab: () => {
       rt.state = "held";
       rt.trail = [];
@@ -89,7 +101,8 @@ function Ball({ index, texture }: { index: number; texture: THREE.Texture }) {
         }
       }}
     >
-      <BallCollider args={[BALL_RADIUS]} mass={0.6} restitution={0.78} friction={0.9} collisionGroups={GROUPS.prop} />
+      {/* hands pass through balls: a ball only moves when it's grabbed, never from a brush of the fingers */}
+      <BallCollider args={[BALL_RADIUS]} mass={0.6} restitution={0.78} friction={0.9} collisionGroups={GROUPS.propNoHand} />
       <mesh castShadow>
         <sphereGeometry args={[BALL_RADIUS, 48, 32]} />
         <meshPhysicalMaterial map={texture} roughness={0.55} clearcoat={0.25} clearcoatRoughness={0.4} sheen={0.4} sheenColor="#ffb08a" />
@@ -140,23 +153,40 @@ function Trails() {
   );
 }
 
-/** Puts balls that have finished their flight back in the rack. Moving an un-held ball is fine. */
+/** How long a ball may lie away from its cradle before it's put back. */
+const AWAY_MS = { scored: 2500, loose: 3000, flying: 6000, rack: 2500 } as const;
+
+/**
+ * Puts balls back in their cradles: after a score or a miss, after a drop, or if one ends up off the
+ * rack for any other reason. Moving a ball nobody is holding is fine.
+ */
 function Respawner() {
   useFrame(() => {
     const now = performance.now();
     balls.forEach((b, i) => {
       const body = b.body;
-      if (!body || b.state === "held" || b.state === "rack") return;
+      if (!body || b.state === "held") {
+        b.awaySince = null;
+        return;
+      }
       const p = body.translation();
-      const restingFor = now - b.since;
-      const lost = p.y < -2 || Math.abs(p.x) > 8 || p.z > 4 || p.z < -9;
-      const done = (b.state === "scored" && restingFor > 2500) || (b.state === "loose" && restingFor > 3500) || (b.state === "flying" && restingFor > 6000);
-      if (lost || done) {
-        body.setTranslation(SLOTS[i], true);
+      const slot = SLOTS[i];
+      const home = Math.hypot(p.x - slot.x, p.y - slot.y, p.z - slot.z) < 0.05;
+      if (home) {
+        b.awaySince = null;
+        if (b.state !== "rack") b.state = "rack";
+        return;
+      }
+      b.awaySince ??= now;
+      const lost = p.y < -1 || Math.abs(p.x) > 8 || p.z > 4 || p.z < -9;
+      const limit = AWAY_MS[b.state as keyof typeof AWAY_MS] ?? 3000;
+      if (lost || now - b.awaySince > limit) {
+        body.setTranslation(slot, true);
         body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         body.setAngvel({ x: 0, y: 0, z: 0 }, true);
         b.state = "rack";
         b.trail = [];
+        b.awaySince = null;
       }
     });
   });
@@ -167,18 +197,38 @@ export function Balls() {
   const texture = useMemo(() => makeBallTexture(), []);
   return (
     <>
-      {/* the rack: a chrome shelf with lips so balls stay put */}
+      {/* the rack: a chrome shelf in the centre, with a cradle for each ball */}
       <RigidBody type="fixed" colliders={false} position={[RACK.x, RACK.y, RACK.z]}>
         <CuboidCollider args={[0.42, 0.015, 0.16]} collisionGroups={GROUPS.world} />
-        <CuboidCollider args={[0.42, 0.04, 0.01]} position={[0, 0.04, 0.15]} collisionGroups={GROUPS.world} />
-        <CuboidCollider args={[0.42, 0.04, 0.01]} position={[0, 0.04, -0.15]} collisionGroups={GROUPS.world} />
-        {[-0.13, 0.13].map((dx) => (
-          <CuboidCollider key={dx} args={[0.01, 0.025, 0.15]} position={[dx, 0.03, 0]} collisionGroups={GROUPS.world} />
-        ))}
+        {SLOT_DX.map((dx) =>
+          Array.from({ length: 8 }, (_, k) => {
+            const a = (k / 8) * Math.PI * 2;
+            return (
+              <BallCollider
+                key={`${dx}-${k}`}
+                args={[CRADLE.bead]}
+                position={[dx + Math.cos(a) * CRADLE.ring, CRADLE.height, Math.sin(a) * CRADLE.ring]}
+                collisionGroups={GROUPS.world}
+              />
+            );
+          }),
+        )}
         <mesh castShadow receiveShadow>
           <boxGeometry args={[0.84, 0.03, 0.32]} />
           <meshStandardMaterial color="#d7dbe6" metalness={1} roughness={0.18} />
         </mesh>
+        {SLOT_DX.map((dx) => (
+          <mesh key={dx} position={[dx, CRADLE.height, 0]} rotation-x={Math.PI / 2} castShadow>
+            <torusGeometry args={[CRADLE.ring, CRADLE.bead, 12, 40]} />
+            <meshStandardMaterial color="#ff6a45" metalness={0.9} roughness={0.25} />
+          </mesh>
+        ))}
+        {SLOT_DX.map((dx) => (
+          <mesh key={`post-${dx}`} position={[dx, CRADLE.height / 2, 0]}>
+            <cylinderGeometry args={[0.012, 0.016, CRADLE.height, 12]} />
+            <meshStandardMaterial color="#cfd5e3" metalness={1} roughness={0.2} />
+          </mesh>
+        ))}
         <mesh position={[0, -RACK.y / 2, 0]} castShadow>
           <cylinderGeometry args={[0.03, 0.05, RACK.y, 16]} />
           <meshStandardMaterial color="#20232f" metalness={0.8} roughness={0.3} />

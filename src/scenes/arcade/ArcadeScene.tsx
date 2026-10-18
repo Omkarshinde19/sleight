@@ -13,7 +13,7 @@ import { balls, Balls } from "./Balls";
 import { Hoop } from "./Hoop";
 
 const WORKSPACE: Workspace = {
-  center: { x: 0.1, y: 1.15, z: 0 },
+  center: { x: 0, y: 1.15, z: 0 },
   width: 1.7,
   height: 1.15,
   depthGain: 1.4,
@@ -71,10 +71,10 @@ export default function ArcadeScene() {
   return (
     <SceneShell
       title="Arcade Room"
-      brief="Make a fist on a basketball, swing forward and up, and open your hand to let go. The ball keeps your hand's speed."
+      brief="Close your hand round a basketball like you would a real one — a half-closed claw holds it. Swing forward and up and open your fingers to shoot; open slowly and it just drops."
       demo="/sessions/demo.json"
       workspace={WORKSPACE}
-      camera={{ position: [0.05, 1.55, 1.55], fov: 55, lookAt: [0, 1.45, -2.6] }}
+      camera={{ position: [0, 1.55, 1.55], fov: 55, lookAt: [0, 1.4, -2.6] }}
       hud={<ArcadeHud />}
     >
       <HandPhysics scale={WORKSPACE.handScale}>
