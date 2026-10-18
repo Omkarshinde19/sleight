@@ -31,6 +31,37 @@ export const useTracking = () => {
   return ctx;
 };
 
+const SOURCE_KEY = "sleight.lastSource";
+
+/** Remember the chosen source for this tab, so a refresh comes back to the camera. */
+function rememberSource(kind: string) {
+  try {
+    sessionStorage.setItem(SOURCE_KEY, kind);
+  } catch {
+    // storage blocked: the chooser just shows again after a refresh
+  }
+}
+
+/**
+ * The source to resume after a refresh: the camera only if it was in use and permission is already
+ * granted (so resuming never pops a permission prompt by surprise).
+ */
+export async function resumableSource(): Promise<"camera" | "sim" | "playback" | null> {
+  let last: string | null = null;
+  try {
+    last = sessionStorage.getItem(SOURCE_KEY);
+  } catch {
+    return null;
+  }
+  if (last !== "camera") return last === "sim" || last === "playback" ? last : null;
+  try {
+    const status = await navigator.permissions?.query({ name: "camera" as PermissionName });
+    return status?.state === "granted" ? "camera" : null;
+  } catch {
+    return null; // Safari before 16 can't query camera permission
+  }
+}
+
 /** Phones get one hand: two-hand tracking roughly halves the tracker's frame rate there. */
 export const isTouchDevice = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
@@ -87,12 +118,23 @@ export function HandTrackingProvider({
       stop();
       sourceRef.current = source;
       handStore.setState({ source: source.kind, status: "loading", error: null });
-      processor.recalibrate();
+      // Fresh filters and calibration per session; the camera also restores the saved depth reference.
+      processor.reset();
+      processor.setPersistence(source.kind === "camera");
+      if (source instanceof CameraSource)
+        source.onError = (message) => {
+          if (sourceRef.current !== source) return;
+          source.stop();
+          sourceRef.current = null;
+          setVideo(null);
+          handStore.setState({ status: "error", error: message, source: null, hands: {} });
+        };
       try {
         await source.start(onFrame);
         if (sourceRef.current !== source) return source.stop(); // superseded while loading
         handStore.setState({ status: "running", delegate: source.delegate ?? null });
         setVideo(source.video ?? null);
+        rememberSource(source.kind);
       } catch (e) {
         sourceRef.current = null;
         const denied = e instanceof CameraError && e.reason === "denied";

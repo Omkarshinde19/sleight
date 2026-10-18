@@ -24,44 +24,93 @@ export class CameraSource implements TrackingSource {
   constructor(private numHands: number) {}
 
   async start(emit: (frame: RawFrame) => void) {
-    // Ask for the camera and load the tracker in parallel.
-    const [stream, landmarker] = await Promise.all([this.openCamera(), this.loadTracker()]);
+    // Ask for the camera and load the tracker in parallel. If either fails, release the other,
+    // otherwise a half-started camera stays locked and the next attempt can't open it.
+    const cam = this.openCamera();
+    const tracker = this.loadTracker(this.preferGpu ? "GPU" : "CPU");
+    let stream: MediaStream;
+    let landmarker: HandLandmarker;
+    try {
+      [stream, landmarker] = await Promise.all([cam, tracker]);
+    } catch (e) {
+      cam.then((s) => s.getTracks().forEach((t) => t.stop())).catch(() => {});
+      tracker.then((l) => l.close()).catch(() => {});
+      throw e;
+    }
     this.stream = stream;
     this.landmarker = landmarker;
+    // Free the camera the moment this page goes away, so a refresh can reopen it straight away.
+    window.addEventListener("pagehide", this.onPageHide);
 
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
+    video.autoplay = true;
     video.srcObject = stream;
-    await video.play();
+    try {
+      await video.play();
+    } catch {
+      // Safari can refuse play() outside a gesture even for muted video; frames still arrive once
+      // metadata is in, so wait for that instead of failing.
+      await new Promise((r) => video.addEventListener("loadeddata", r, { once: true }));
+    }
     this.video = video;
     this.running = true;
+    stream.getVideoTracks()[0]?.addEventListener("ended", () => this.onError?.("The camera was disconnected."));
 
     let lastVideoTime = -1;
+    let failures = 0;
     const tick = () => {
       if (!this.running) return;
-      if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.currentTime !== lastVideoTime) {
         lastVideoTime = video.currentTime;
         const t0 = performance.now();
-        const result = landmarker.detectForVideo(video, t0);
-        const hands: RawHand[] = result.landmarks.map((landmarks, i) => ({
-          // Checked against a recorded (unmirrored) webcam clip: tasks-vision 1.x labels the user's
-          // actual hand for unmirrored frames, despite older docs describing a selfie-mirror convention.
-          handedness: (result.handedness[i]?.[0]?.categoryName === "Right" ? "Right" : "Left") as Handedness,
-          score: result.handedness[i]?.[0]?.score ?? 0,
-          landmarks: landmarks.map(({ x, y, z }) => ({ x, y, z })),
-          worldLandmarks: (result.worldLandmarks[i] ?? []).map(({ x, y, z }) => ({ x, y, z })),
-        }));
-        emit({
-          t: t0,
-          hands: dedupeHandedness(hands),
-          aspect: video.videoWidth / video.videoHeight || 4 / 3,
-          latencyMs: performance.now() - t0,
-        });
+        try {
+          const result = this.landmarker!.detectForVideo(video, t0);
+          failures = 0;
+          const hands: RawHand[] = result.landmarks.map((landmarks, i) => ({
+            // Checked against a recorded (unmirrored) webcam clip: tasks-vision 1.x labels the user's
+            // actual hand for unmirrored frames, despite older docs describing a selfie-mirror convention.
+            handedness: (result.handedness[i]?.[0]?.categoryName === "Right" ? "Right" : "Left") as Handedness,
+            score: result.handedness[i]?.[0]?.score ?? 0,
+            landmarks: landmarks.map(({ x, y, z }) => ({ x, y, z })),
+            worldLandmarks: (result.worldLandmarks[i] ?? []).map(({ x, y, z }) => ({ x, y, z })),
+          }));
+          emit({
+            t: t0,
+            hands: dedupeHandedness(hands),
+            aspect: video.videoWidth / video.videoHeight || 4 / 3,
+            latencyMs: performance.now() - t0,
+          });
+        } catch (e) {
+          // A GPU context that dies after a reload throws on every frame: fall back to the CPU once.
+          if (++failures === 5) void this.fallBackToCpu(e as Error);
+        }
       }
       this.schedule(tick);
     };
     this.schedule(tick);
+  }
+
+  /** Called when the camera fails after starting (unplugged, permission revoked, tracker dead). */
+  onError?: (message: string) => void;
+  /** Start on the CPU delegate (used after a GPU failure in this browser). */
+  preferGpu = true;
+
+  private onPageHide = () => this.stop();
+
+  private async fallBackToCpu(e: Error) {
+    if (this.delegate === "CPU") {
+      this.onError?.(`The hand tracker stopped: ${e.message}`);
+      return;
+    }
+    try {
+      const cpu = await this.loadTracker("CPU");
+      this.landmarker?.close();
+      this.landmarker = cpu;
+    } catch (err) {
+      this.onError?.(`The hand tracker stopped: ${(err as Error).message}`);
+    }
   }
 
   private schedule(fn: () => void) {
@@ -73,20 +122,30 @@ export class CameraSource implements TrackingSource {
   private async openCamera() {
     if (!navigator.mediaDevices?.getUserMedia)
       throw new CameraError("This browser has no camera access (it needs HTTPS or localhost).", "unavailable");
-    try {
-      return await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
-      });
-    } catch (e) {
-      const name = (e as DOMException)?.name;
-      if (name === "NotAllowedError" || name === "SecurityError")
-        throw new CameraError("Camera permission was declined.", "denied");
-      throw new CameraError("No usable camera was found.", "unavailable");
+    const constraints: MediaStreamConstraints = {
+      audio: false,
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+    };
+    // Right after a refresh the old page may still hold the camera for a moment ("could not start
+    // video source"). That's worth a few quick retries; a denied permission is not.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        const name = (e as DOMException)?.name;
+        if (name === "NotAllowedError" || name === "SecurityError") throw new CameraError("Camera permission was declined.", "denied");
+        const busy = name === "NotReadableError" || name === "AbortError" || name === "TrackStartError";
+        if (busy && attempt < 4) {
+          await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+          continue;
+        }
+        if (busy) throw new CameraError("The camera is busy — close other apps or tabs using it and try again.", "unavailable");
+        throw new CameraError("No usable camera was found.", "unavailable");
+      }
     }
   }
 
-  private async loadTracker() {
+  private async loadTracker(prefer: "GPU" | "CPU") {
     const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
     const fileset = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
     const make = (delegate: "GPU" | "CPU") =>
@@ -98,23 +157,27 @@ export class CameraSource implements TrackingSource {
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-    try {
-      const lm = await make("GPU");
-      this.delegate = "GPU";
-      return lm;
-    } catch {
+    if (prefer === "GPU") {
       try {
-        const lm = await make("CPU");
-        this.delegate = "CPU";
+        const lm = await make("GPU");
+        this.delegate = "GPU";
         return lm;
-      } catch (e) {
-        throw new CameraError(`The hand tracker failed to load: ${(e as Error).message}`, "tracker");
+      } catch {
+        // fall through to CPU
       }
+    }
+    try {
+      const lm = await make("CPU");
+      this.delegate = "CPU";
+      return lm;
+    } catch (e) {
+      throw new CameraError(`The hand tracker failed to load: ${(e as Error).message}`, "tracker");
     }
   }
 
   stop() {
     this.running = false;
+    window.removeEventListener("pagehide", this.onPageHide);
     const v = this.video as (HTMLVideoElement & { cancelVideoFrameCallback?: (h: number) => void }) | undefined;
     if (v?.cancelVideoFrameCallback) v.cancelVideoFrameCallback(this.frameHandle);
     cancelAnimationFrame(this.frameHandle);

@@ -12,7 +12,7 @@ import { DebugOverlay } from "../hud/DebugOverlay";
 import { SourceChooser } from "../hud/SourceChooser";
 import { SceneControls } from "../hud/SceneControls";
 import styles from "../hud/hud.module.css";
-import { HandTrackingProvider, isTouchDevice, useTracking } from "../tracking/HandTrackingProvider";
+import { HandTrackingProvider, isTouchDevice, resumableSource, useTracking } from "../tracking/HandTrackingProvider";
 import { ExposeThree } from "./ExposeThree";
 import { Studio } from "./Studio";
 import { Weather } from "../weather/Weather";
@@ -49,6 +49,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
   const tracking = useTracking();
   const source = useHandStore((s) => s.source);
   const status = useHandStore((s) => s.status);
+  const calibrating = useHandStore((s) => s.calibrating && s.source === "camera" && Object.keys(s.hands).length > 0);
 
   // ?source=sim|camera|demo starts straight away (used for demos and automated checks).
   useEffect(() => {
@@ -58,6 +59,13 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
     if (want === "sim") tracking.startSim();
     else if (want === "demo") tracking.startPlayback(demo);
     else if (want === "camera") tracking.startCamera();
+    else
+      // After a refresh, carry on with whatever this tab was using.
+      void resumableSource().then((kind) => {
+        if (kind === "camera") tracking.startCamera();
+        else if (kind === "sim") tracking.startSim();
+        else if (kind === "playback") tracking.startPlayback(demo);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,6 +114,11 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
       </p>
 
       {hud}
+      {calibrating && (
+        <p className={`${styles.calibrating} glass mono`} role="status">
+          Hold your hand still for a second — calibrating depth
+        </p>
+      )}
       <div className={styles.rotate} role="note">
         <span aria-hidden>⤾</span>
         Turn your phone sideways — the scenes are made for landscape.

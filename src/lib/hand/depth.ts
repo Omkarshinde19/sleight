@@ -39,6 +39,10 @@ export class DepthEstimator {
     if (scale > 0) this.samples.push(scale);
   }
 
+  get sampleCount() {
+    return this.samples.length;
+  }
+
   /** Finish calibration with the median of the samples, which ignores a few bad frames. */
   finishCalibration(): boolean {
     if (this.samples.length < 5) return false;
