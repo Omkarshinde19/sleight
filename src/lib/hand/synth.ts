@@ -18,6 +18,9 @@ export const POSES: Record<Exclude<Gesture, "none">, HandPose> = {
   point: { curl: [0.8, 0, 1, 1, 1], pinch: 0 },
 };
 
+/** Half-closed claw: how you hold a basketball. Not a classified gesture, but a grip of ~0.5. */
+export const CLAW: HandPose = { curl: [0.45, 0.55, 0.55, 0.55, 0.55], pinch: 0 };
+
 export const lerpPose = (a: HandPose, b: HandPose, t: number): HandPose => ({
   curl: a.curl.map((c, i) => c + (b.curl[i] - c) * t) as HandPose["curl"],
   pinch: a.pinch + (b.pinch - a.pinch) * t,

@@ -1,9 +1,10 @@
-import { lerpPose, POSES, synthHand, type HandPose, type Orientation } from "../hand/synth";
+import { CLAW, lerpPose, POSES, synthHand, type HandPose, type Orientation } from "../hand/synth";
 import type { Workspace } from "../hand/mapping";
 import { clamp, type Gesture, type Handedness, type Point, type RawFrame } from "../hand/types";
 import type { TrackingSource } from "./source";
 
-type PoseName = Exclude<Gesture, "none">;
+type PoseName = Exclude<Gesture, "none"> | "claw";
+const SIM_POSES = { ...POSES, claw: CLAW };
 
 export interface SimHandState {
   handedness: Handedness;
@@ -164,7 +165,7 @@ export class SimulatedSource implements TrackingSource {
 
     // Fingers move toward the target pose with a ~60 ms time constant.
     const blend = 1 - Math.exp(-dt / 0.06);
-    for (const h of Object.values(this.hands)) h.pose = lerpPose(h.pose, POSES[h.target], blend);
+    for (const h of Object.values(this.hands)) h.pose = lerpPose(h.pose, SIM_POSES[h.target], blend);
 
     // Held keys
     const h = this.hands[this.active];
@@ -213,7 +214,7 @@ export class SimulatedSource implements TrackingSource {
       const key = e.key.toLowerCase();
       this.held.add(key);
       const h = this.hands[this.active];
-      const poses: Record<string, PoseName> = { "1": "open", "2": "pinch", "3": "fist", "4": "point" };
+      const poses: Record<string, PoseName> = { "1": "open", "2": "pinch", "3": "fist", "4": "point", "5": "claw" };
       if (poses[key]) h.target = poses[key];
       else if (key === " ") {
         h.target = this.grabGesture();

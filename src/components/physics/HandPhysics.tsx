@@ -36,6 +36,14 @@ export interface Grabbable {
   attach?: "fixed" | "drive" | { stiffness: number; damping: number };
   /** Gestures that keep holding once picked up (default: `gestures`). */
   holdGestures?: Gesture[];
+  /**
+   * Grab by how closed the hand is instead of by gesture: a half-closed claw (smoothed grip ≥ `grab`)
+   * on or near the object picks it up, and it stays held until the fingers open (grip < `release`).
+   * Used for the basketball, which you cradle rather than make a fist around.
+   */
+  grip?: { grab: number; release: number };
+  /** Collision groups to restore after release (default: GROUPS.prop). */
+  restGroups?: number;
   /** For spring attachments: the grab point on the body, in its local frame. */
   localHandle?: Point;
   /** Give the object the hand's velocity on release. */
@@ -75,6 +83,8 @@ const TIPS = [LM.THUMB_TIP, LM.INDEX_TIP, LM.MIDDLE_TIP, LM.RING_TIP, LM.PINKY_T
 const FOLLOW_TAU = 0.03;
 /** A grab gesture can pick something up this long after it forms (forming a fist just before contact). */
 const GRAB_GRACE = 0.3;
+/** Smoothing for the continuous grip value used by grip-based grabbing. */
+const GRIP_TAU = 0.06;
 const PARKED = { x: 0, y: -50, z: 0 };
 
 interface HandRuntime {
@@ -85,6 +95,8 @@ interface HandRuntime {
   rot: THREE.Quaternion;
   prevGesture: Gesture;
   grabWindowUntil: number;
+  /** Grip (0 open … 1 fist), smoothed so a jittery frame can't drop or snatch a ball. */
+  grip: number;
   held: { item: Grabbable; joint: ImpulseJoint | null; drive?: { offset: THREE.Vector3; rot: THREE.Quaternion } } | null;
 }
 
@@ -99,6 +111,7 @@ const newRuntime = (): HandRuntime => ({
   rot: new THREE.Quaternion(),
   prevGesture: "none",
   grabWindowUntil: 0,
+  grip: 0,
   held: null,
 });
 
@@ -155,7 +168,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
         body.setAngvel({ x: -6, y: 0, z: 0 }, true);
       }
       // Let the object clear the fingers before hands can touch it again.
-      if (item.switchGroups !== false) setTimeout(() => setGroups(body, GROUPS.prop), 150);
+      if (item.switchGroups !== false) setTimeout(() => setGroups(body, item.restGroups ?? GROUPS.prop), 150);
     }
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: null } }));
   };
@@ -242,6 +255,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       if (!h) {
         if (rt.held) release(hand, rt, false);
         rt.prevGesture = "none";
+        rt.grip = 0;
         // Teleport (not a kinematic move): sweeping to the parking spot in one step would
         // smash anything in between, since kinematic bodies with CCD push at any speed.
         if (rt.pos[0].y > -40) bodies.forEach((b) => b?.setTranslation(PARKED, false));
@@ -270,20 +284,29 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       const g = h.gesture;
       if (isGrabGesture(g) && !isGrabGesture(rt.prevGesture)) rt.grabWindowUntil = now + GRAB_GRACE;
       rt.prevGesture = g;
+      rt.grip += (h.features.grip - rt.grip) * (1 - Math.exp(-dt / GRIP_TAU));
 
-      if (rt.held && rt.held.item.shouldRelease?.()) release(hand, rt, false);
-      else if (rt.held && !(rt.held.item.holdGestures ?? rt.held.item.gestures).includes(g)) release(hand, rt, true);
+      const held = rt.held?.item;
+      const stillHolding = (item: Grabbable) => (item.grip ? rt.grip >= item.grip.release : (item.holdGestures ?? item.gestures).includes(g));
+      if (held && held.shouldRelease?.()) release(hand, rt, false);
+      else if (held && !stillHolding(held)) release(hand, rt, true);
       if (rt.held?.drive) drive(rt, rt.held.item, rt.held.drive, dt);
-      else if (!rt.held && isGrabGesture(g) && now <= rt.grabWindowUntil) {
+      else if (!rt.held) {
         const other = hands.current[hand === "Right" ? "Left" : "Right"];
+        const gestureWindow = isGrabGesture(g) && now <= rt.grabWindowUntil;
         let best: Grabbable | null = null;
         let bestD = Infinity;
         for (const item of registry.values()) {
-          if (!item.gestures.includes(g) || other.held?.item.id === item.id) continue;
+          if (other.held?.item.id === item.id) continue;
+          // grip-based items: a closing claw anywhere near the object takes it
+          const wants = item.grip ? rt.grip >= item.grip.grab : gestureWindow && item.gestures.includes(g);
+          if (!wants) continue;
           const b = item.body();
           if (!b) continue;
           const p = item.grabPoint?.() ?? b.translation();
-          const d = Math.hypot(p.x - h.grip.x, p.y - h.grip.y, p.z - h.grip.z);
+          // for a cradled object the palm counts as much as the grip point
+          const from = item.grip ? h.palm : h.grip;
+          const d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
           if (d < item.reach && d < bestD) {
             best = item;
             bestD = d;

@@ -15,6 +15,8 @@ export const GROUPS = {
   world: interactionGroups(LAYER.WORLD, [LAYER.HAND, LAYER.PROP, LAYER.HELD, LAYER.TOOL]),
   hand: interactionGroups(LAYER.HAND, [LAYER.WORLD, LAYER.PROP]),
   prop: interactionGroups(LAYER.PROP, [LAYER.WORLD, LAYER.HAND, LAYER.PROP, LAYER.HELD, LAYER.TOOL, LAYER.ANATOMY]),
+  /** A prop that hands pass through: it only moves when grabbed (no accidental knocks off a rack). */
+  propNoHand: interactionGroups(LAYER.PROP, [LAYER.WORLD, LAYER.PROP, LAYER.HELD, LAYER.TOOL, LAYER.ANATOMY]),
   held: interactionGroups(LAYER.HELD, [LAYER.WORLD, LAYER.PROP, LAYER.HELD, LAYER.ANATOMY]),
   tool: interactionGroups(LAYER.TOOL, [LAYER.WORLD, LAYER.PROP, LAYER.ANATOMY]),
   anatomy: interactionGroups(LAYER.ANATOMY, [LAYER.PROP, LAYER.HELD, LAYER.TOOL]),
