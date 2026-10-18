@@ -199,8 +199,8 @@ export default function LandingStage() {
     <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.2, 1.55], fov: 42, near: 0.05, far: 30 }} onCreated={({ camera }) => camera.lookAt(0, 1.13, 0)} gl={{ antialias: true }}>
       <Studio intensity={1.1} />
       <Weather />
-      <ChromeHand hand="Right" scale={HAND_SCALE} />
-      <ChromeHand hand="Left" scale={HAND_SCALE} />
+      <ChromeHand hand="Right" scale={HAND_SCALE} elbowDrop={0} forearm={0.55} />
+      <ChromeHand hand="Left" scale={HAND_SCALE} elbowDrop={0} forearm={0.55} />
       <Driver />
     </Canvas>
   );
