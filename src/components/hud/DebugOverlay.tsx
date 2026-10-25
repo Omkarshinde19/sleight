@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { BONES, type Handedness } from "@/lib/hand/types";
+import { feel } from "@/state/feel";
 import { handStore, useHandStore } from "@/state/handStore";
 import { useTracking } from "../tracking/HandTrackingProvider";
 import styles from "./hud.module.css";
@@ -75,11 +76,19 @@ export function DebugOverlay() {
           const hand = s.hands[h];
           if (!hand) return `<span class="${styles.dim}">${h[0]} —</span>`;
           const held = s.holding[h];
-          return `<span style="color:${HAND_COLOUR[h]}">${h[0]}</span> ${hand.gesture.toUpperCase().padEnd(5, " ")} grip ${hand.features.grip.toFixed(2)} pinch ${hand.features.pinchDistance.toFixed(2)} z ${hand.depth.toFixed(2)}${held ? ` · <b>HOLD ${held}</b>` : ""}`;
+          return `<span style="color:${HAND_COLOUR[h]}">${h[0]}</span> ${hand.gesture.toUpperCase().padEnd(5, " ")} grip ${hand.features.grip.toFixed(2)} pinch ${hand.features.pinchDistance.toFixed(2)} z ${hand.depth.toFixed(2)}${hand.lost ? ` <span class="${styles.warn}">LOST</span>` : ""}${held ? ` · <b>HOLD ${held}</b>` : ""}`;
         });
+        const f = feel.stats();
+        const perTracker = s.trackerFps > 0 ? renderFps / s.trackerFps : 0;
+        const feelRows = [
+          `<b>feel</b> jitter ${f.jitterMm === null ? "—" : `${f.jitterMm.toFixed(1)} mm`} · bones ±${f.boneCvRawPct.toFixed(1)}% raw → ±${f.boneCvPct.toFixed(1)}%`,
+          `label flips ${f.labelFlipsPerMin.toFixed(1)}/min (fixed ${f.labelFixesPerMin.toFixed(1)}) · ${perTracker.toFixed(1)} renders/tracker frame`,
+          `dropouts ${f.dropoutsPerMin.toFixed(1)}/min (bridged ${f.bridgedPerMin.toFixed(1)}, longest ${f.longestGapMs.toFixed(0)} ms) · held through ${f.coastSaves} · dropped ${f.lossDrops}`,
+        ];
         stats.current.innerHTML = [
           `render ${renderFps.toFixed(0)} fps · tracker ${s.trackerFps.toFixed(0)} fps · ${s.source === "camera" ? `${s.latencyMs.toFixed(1)} ms ${s.delegate ?? ""}` : (s.source ?? "no source")}`,
           ...rows,
+          ...feelRows,
           s.calibrating ? `<span class="${styles.warn}">calibrating depth — hold still</span>` : "",
         ]
           .filter(Boolean)
