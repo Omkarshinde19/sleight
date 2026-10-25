@@ -35,6 +35,12 @@ export const handPose = {
     return c.pose;
   },
 
+  /** The hands' labels were exchanged: each smoothed pose stays with its hand. */
+  swap() {
+    [interpolators.Left, interpolators.Right] = [interpolators.Right, interpolators.Left];
+    cache.Left.t = cache.Right.t = -1;
+  },
+
   reset() {
     this.active = false;
     interpolators.Left.reset();

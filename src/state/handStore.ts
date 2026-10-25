@@ -18,6 +18,8 @@ export interface HandStore {
   holding: Partial<Record<Handedness, string | null>>;
   recording: boolean;
   calibrating: boolean;
+  /** Counts Left/Right label exchanges, so per-hand state elsewhere (the grab system) can follow. */
+  labelSwaps: number;
   debug: boolean;
   set: (patch: Partial<HandStore>) => void;
 }
@@ -33,6 +35,7 @@ export const useHandStore = create<HandStore>((set) => ({
   holding: {},
   recording: false,
   calibrating: false,
+  labelSwaps: 0,
   debug: false,
   set: (patch) => set(patch),
 }));

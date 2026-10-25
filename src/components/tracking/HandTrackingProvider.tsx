@@ -64,6 +64,12 @@ export async function resumableSource(): Promise<"camera" | "sim" | "playback" |
   }
 }
 
+/** The tracker exchanged the hands' labels: the smoothed poses and the grab system follow the hands. */
+function onLabelSwap() {
+  handPose.swap();
+  handStore.setState((s) => ({ labelSwaps: s.labelSwaps + 1 }));
+}
+
 /** Phones get one hand: two-hand tracking roughly halves the tracker's frame rate there. */
 export const isTouchDevice = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
@@ -82,7 +88,7 @@ export function HandTrackingProvider({
   surface: React.RefObject<HTMLElement | null>;
 }) {
   const sourceRef = useRef<TrackingSource | null>(null);
-  const processor = useMemo(() => new HandProcessor(workspace, feel), [workspace]);
+  const processor = useMemo(() => new HandProcessor(workspace, feel, onLabelSwap), [workspace]);
   const recorder = useMemo(() => new Recorder(), []);
   const lastFrameT = useRef(0);
   const [sim, setSim] = useState<SimulatedSource | null>(null);
