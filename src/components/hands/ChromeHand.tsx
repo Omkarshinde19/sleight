@@ -3,9 +3,9 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { FINGERS, LM, type Handedness, type Point } from "@/lib/hand/types";
+import { BONES, FINGERS, LM, type Handedness, type Point } from "@/lib/hand/types";
 import { makeChromeMaterial } from "@/lib/materials/chrome";
-import { handPose } from "@/state/handPose";
+import { handPose, type HandPoseSample } from "@/state/handPose";
 import { handStore } from "@/state/handStore";
 
 /*
@@ -119,6 +119,21 @@ function ellipsoid(m: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, dorsal
   m.scale.y *= 0.5;
 }
 
+/** Show the real hand as cyan lines, fading in once the robot hand is held back more than 1 cm. */
+function updateGhost(ghost: THREE.LineSegments, pose: HandPoseSample | null) {
+  const pushed = pose ? Math.hypot(pose.push.x, pose.push.y, pose.push.z) : 0;
+  const mat = ghost.material as THREE.LineBasicMaterial;
+  mat.opacity = Math.min(0.7, Math.max(0, (pushed - 0.01) * 14));
+  ghost.visible = mat.opacity > 0.01;
+  if (!pose || !ghost.visible) return;
+  const gp = ghost.geometry.getAttribute("position") as THREE.BufferAttribute;
+  BONES.forEach(([a, b], i) => {
+    gp.setXYZ(i * 2, pose.real[a].x, pose.real[a].y, pose.real[a].z);
+    gp.setXYZ(i * 2 + 1, pose.real[b].x, pose.real[b].y, pose.real[b].z);
+  });
+  gp.needsUpdate = true;
+}
+
 interface Parts {
   segments: THREE.Mesh[];
   plates: THREE.Mesh[];
@@ -153,7 +168,7 @@ export function ChromeHand({
 }) {
   const group = useRef<THREE.Group>(null);
 
-  const { parts, root, palmGeo } = useMemo(() => {
+  const { parts, root, palmGeo, ghost } = useMemo(() => {
     const chrome = makeChromeMaterial(tint);
     const muscle = makeChromeMaterial("#cdd3e2");
     muscle.roughness = 0.16;
@@ -199,7 +214,14 @@ export function ChromeHand({
       collar: add(ring, gunmetal),
       wristHinge: add(hinge, gunmetal),
     };
-    return { parts, root, palmGeo };
+    // Ghost: where the real hand is while the robot hand is held back by something solid.
+    const ghostGeo = new THREE.BufferGeometry();
+    ghostGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(BONES.length * 6), 3));
+    const ghost = new THREE.LineSegments(ghostGeo, new THREE.LineBasicMaterial({ color: "#7fe3f0", transparent: true, opacity: 0, depthTest: false }));
+    ghost.frustumCulled = false;
+    ghost.renderOrder = 10;
+    root.add(ghost);
+    return { parts, root, palmGeo, ghost };
   }, [tint]);
 
   useFrame(() => {
@@ -208,7 +230,10 @@ export function ChromeHand({
     group.current.visible = !!h;
     if (!h) return;
     // the interpolated pose (smooth at any frame rate, and exactly where the physics colliders are)
-    const J = (handPose.sample(hand) ?? h).joints.map((p) => toV(p));
+    const pose = handPose.sample(hand);
+    const J = (pose ?? h).joints.map((p) => toV(p));
+
+    updateGhost(ghost, pose);
     const s = scale;
 
     // Palm frame: across the knuckles, toward the fingers, and the back of the hand (dorsal).
