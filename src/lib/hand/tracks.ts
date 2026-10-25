@@ -18,6 +18,8 @@ interface Track {
   vote: number;
   /** Matched in the current frame. */
   seen: boolean;
+  /** This frame's raw label, signed by confidence (+ = Right). */
+  raw: number;
 }
 
 export interface HandTrackerOptions {
@@ -31,6 +33,12 @@ export interface HandTrackerOptions {
   /** How strongly the votes must disagree before labels change (swap gain for two hands, −vote for one). */
   swapMargin: number;
   flipMargin: number;
+  /**
+   * Weight of "the right hand is the one on the image's left" (the frame is unmirrored) when both
+   * hands are in view: decisive when a second hand appears, a nudge afterwards (hands can cross).
+   */
+  sideWeight: number;
+  sideNudge: number;
 }
 
 export const DEFAULT_TRACKER: HandTrackerOptions = {
@@ -40,6 +48,8 @@ export const DEFAULT_TRACKER: HandTrackerOptions = {
   voteAlpha: 0.12,
   swapMargin: 1.2,
   flipMargin: 0.25,
+  sideWeight: 1,
+  sideNudge: 0.4,
 };
 
 const other = (h: Handedness): Handedness => (h === "Right" ? "Left" : "Right");
@@ -52,6 +62,11 @@ export class HandTracker {
   /** Called when an output label changes (should be rare) or a raw label is overruled. */
   onFlip?: () => void;
   onFix?: () => void;
+  /**
+   * Called when the hands' labels are exchanged (or a lone hand changes label), before this frame's
+   * detections are returned: per-hand state keyed by label should move with the physical hand.
+   */
+  onSwap?: () => void;
 
   constructor(private opts: HandTrackerOptions = DEFAULT_TRACKER) {}
 
@@ -107,6 +122,7 @@ export class HandTracker {
     };
     search(0, new Set(), hands.map(() => null), 0, 0);
 
+    let born = false;
     const assigned: Track[] = hands.map((h, d) => {
       const signed = (h.handedness === "Right" ? 1 : -1) * Math.max(0.3, h.score);
       const t = best[d];
@@ -116,6 +132,7 @@ export class HandTracker {
         t.lastT = tMs;
         t.vote += o.voteAlpha * (signed - t.vote);
         t.seen = true;
+        t.raw = signed;
         return t;
       }
       // A new hand. Its raw label wins over a track that wasn't seen this frame (that hand has
@@ -124,11 +141,13 @@ export class HandTracker {
       let label = h.handedness;
       if (this.tracks.some((x) => x.label === label && inView(x))) label = other(label);
       this.tracks = this.tracks.filter((x) => x.label !== label || inView(x));
-      const nt: Track = { label, x: pos[d].x, y: pos[d].y, lastT: tMs, vote: label === "Right" ? 0.5 : -0.5, seen: true };
+      const nt: Track = { label, x: pos[d].x, y: pos[d].y, lastT: tMs, vote: label === "Right" ? 0.5 : -0.5, seen: true, raw: signed };
       this.tracks.push(nt);
+      born = true;
       return nt;
     });
 
+    if (born) this.settlePair();
     this.decideLabels();
 
     return hands.map((h, d) => {
@@ -138,22 +157,49 @@ export class HandTracker {
     });
   }
 
+  /** +1 if the labels put the right hand on the image's left (as an unmirrored webcam sees it), −1 if not, 0 unless both are in view. */
+  private sideAgreement(a: Track, b: Track) {
+    if (!a.seen || !b.seen) return 0;
+    const right = a.label === "Right" ? a : b;
+    const left = a.label === "Right" ? b : a;
+    return right.x < left.x ? 1 : -1;
+  }
+
+  private swapPair(a: Track, b: Track) {
+    [a.label, b.label] = [b.label, a.label];
+    this.onFlip?.();
+    this.onFlip?.();
+    this.onSwap?.();
+  }
+
+  /**
+   * A second hand just appeared. Label the pair from this frame alone (both raw labels, and which
+   * side each hand is on), not from what a lone hand was called: MediaPipe often mislabels a hand
+   * that enters the frame by itself, and that label used to stick until both hands jumped across.
+   */
+  private settlePair() {
+    const [a, b] = this.tracks;
+    if (!a || !b || !a.seen || !b.seen) return;
+    const now = agree(a.label, a.raw) + agree(b.label, b.raw) + this.opts.sideWeight * this.sideAgreement(a, b);
+    const swapped = agree(b.label, a.raw) + agree(a.label, b.raw) - this.opts.sideWeight * this.sideAgreement(a, b);
+    if (swapped > now) this.swapPair(a, b);
+    for (const t of [a, b]) t.vote = t.label === "Right" ? 0.6 : -0.6;
+  }
+
   /** Change labels only when the votes clearly disagree with them. Two tracks always differ. */
   private decideLabels() {
     const o = this.opts;
     const [a, b] = this.tracks;
     if (a && b) {
       if (a.label === b.label) b.label = other(a.label);
-      const now = agree(a.label, a.vote) + agree(b.label, b.vote);
-      const swapped = agree(b.label, a.vote) + agree(a.label, b.vote);
-      if (swapped - now > o.swapMargin) {
-        [a.label, b.label] = [b.label, a.label];
-        this.onFlip?.();
-        this.onFlip?.();
-      }
+      const side = o.sideNudge * this.sideAgreement(a, b);
+      const now = agree(a.label, a.vote) + agree(b.label, b.vote) + side;
+      const swapped = agree(b.label, a.vote) + agree(a.label, b.vote) - side;
+      if (swapped - now > o.swapMargin) this.swapPair(a, b);
     } else if (a && agree(a.label, a.vote) < -o.flipMargin) {
       a.label = other(a.label);
       this.onFlip?.();
+      this.onSwap?.();
     }
   }
 }

@@ -57,6 +57,29 @@ describe("HandTracker", () => {
     expect(labels(back)).toEqual(["Left@0.7", "Right@0.3"].sort());
   });
 
+  it("labels the pair from the frame where the second hand appears, not from a mislabelled lone hand", () => {
+    // From a real session: the right hand entered alone and MediaPipe called it "Left" for 13 frames.
+    const tr = new HandTracker();
+    let swaps = 0;
+    tr.onSwap = () => swaps++;
+    for (let f = 0; f < 13; f++) expect(tr.assign([hand("Left", 0.3)], f * 33, 4 / 3)[0].handedness).toBe("Left");
+    // the left hand comes in, and now both raw labels are right
+    const both = tr.assign([hand("Right", 0.3), hand("Left", 0.7)], 13 * 33, 4 / 3);
+    expect(labels(both)).toEqual(["Left@0.7", "Right@0.3"].sort());
+    expect(swaps).toBe(1);
+    for (let f = 14; f < 40; f++) expect(labels(tr.assign([hand("Right", 0.3), hand("Left", 0.7)], f * 33, 4 / 3))).toEqual(labels(both));
+    expect(swaps).toBe(1);
+  });
+
+  it("doesn't relabel a correctly labelled pair", () => {
+    const tr = new HandTracker();
+    let swaps = 0;
+    tr.onSwap = () => swaps++;
+    tr.assign([hand("Right", 0.3)], 0, 4 / 3);
+    tr.assign([hand("Right", 0.3), hand("Left", 0.7)], 33, 4 / 3);
+    expect(swaps).toBe(0);
+  });
+
   it("gives a new hand its own label when the old hand of that label has left", () => {
     const tr = new HandTracker();
     tr.assign([hand("Right", 0.2)], 0, 4 / 3);
