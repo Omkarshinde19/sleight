@@ -2,9 +2,11 @@
 
 import { Grid } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { useObstacle } from "@/state/obstacles";
 
 /** Blueprint floor: a dark reflective slab with a cyan drafting grid, and a physics ground. */
 export function Floor({ size = 30 }: { size?: number }) {
+  useObstacle("floor", () => ({ kind: "floor", y: 0 }));
   return (
     <>
       <RigidBody type="fixed" colliders={false} name="floor">
