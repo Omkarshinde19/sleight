@@ -65,9 +65,11 @@ interface HandMeter {
   rawBones: BoneStats;
   outBones: BoneStats;
   lastSeen: number | null;
+  /** Frames that arrived without this hand since it was last seen. */
+  missed: number;
 }
 
-const newHandMeter = (): HandMeter => ({ window: [], rawBones: newBoneStats(), outBones: newBoneStats(), lastSeen: null });
+const newHandMeter = (): HandMeter => ({ window: [], rawBones: newBoneStats(), outBones: newBoneStats(), lastSeen: null, missed: 0 });
 
 export class FeelMeter {
   private hands: Record<Handedness, HandMeter> = { Left: newHandMeter(), Right: newHandMeter() };
@@ -99,16 +101,15 @@ export class FeelMeter {
   /** A hand was detected this frame. `raw` = tracker world landmarks, `out` = the joints we render. */
   detected(hand: Handedness, tMs: number, raw: Point[], out: Point[], palm: Point) {
     const m = this.hands[hand];
-    if (m.lastSeen !== null) {
+    // A dropout is frames arriving without the hand, not the tracker running slowly.
+    if (m.lastSeen !== null && m.missed > 0) {
       const gap = tMs - m.lastSeen;
-      // a missed frame or more (frames are ~33 ms apart from the webcam)
-      if (gap > 50) {
-        this.dropouts++;
-        if (gap <= this.bridgeMs) this.bridged++;
-        this.longestGap = Math.max(this.longestGap, gap);
-      }
+      this.dropouts++;
+      if (gap <= this.bridgeMs) this.bridged++;
+      this.longestGap = Math.max(this.longestGap, gap);
     }
     m.lastSeen = tMs;
+    m.missed = 0;
     observeBones(m.rawBones, raw);
     observeBones(m.outBones, out);
 
@@ -131,6 +132,11 @@ export class FeelMeter {
     }
   }
 
+  /** A frame arrived without this hand (while it was being tracked). */
+  missed(hand: Handedness) {
+    if (this.hands[hand].lastSeen !== null) this.hands[hand].missed++;
+  }
+
   /** The hands' labels were exchanged: keep each hand's history with it. */
   swap() {
     [this.hands.Left, this.hands.Right] = [this.hands.Right, this.hands.Left];
@@ -139,6 +145,7 @@ export class FeelMeter {
   /** The hand left (or was reset); a later detection is a new appearance, not a gap. */
   forget(hand: Handedness) {
     this.hands[hand].lastSeen = null;
+    this.hands[hand].missed = 0;
     this.hands[hand].window = [];
   }
 

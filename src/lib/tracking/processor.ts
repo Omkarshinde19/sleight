@@ -190,6 +190,7 @@ export class HandProcessor {
     }
     for (const [h, ch] of Object.entries(this.channels) as [Handedness, HandChannel][]) {
       if (out[h]) continue;
+      if (ch.last) this.feel.missed(h);
       const missing = frame.t - ch.lastSeen;
       if (ch.last && missing <= COAST_MS) out[h] = coast(ch.last, missing / 1000);
       else if (ch.last) {
