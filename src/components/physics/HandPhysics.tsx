@@ -10,6 +10,7 @@ import { throwVelocity, type MotionHistory, type ThrowOptions } from "@/lib/hand
 import { GROUPS } from "@/lib/physics/groups";
 import { feel } from "@/state/feel";
 import { handPose } from "@/state/handPose";
+import { heldSpheres, swapHeldSpheres } from "@/state/obstacles";
 import { handStore } from "@/state/handStore";
 
 export interface ReleaseInfo {
@@ -199,6 +200,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     if (!rt.held) return;
     const { item, joint } = rt.held;
     rt.held = null;
+    delete heldSpheres[hand];
     if (joint && world.getImpulseJoint(joint.handle)) world.removeImpulseJoint(joint, true);
     driveTargets.delete(item.id);
     const body = item.body();
@@ -271,6 +273,9 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       const from = new THREE.Vector3(params.anchor1.x, params.anchor1.y, params.anchor1.z);
       const to = new THREE.Vector3(0, 0.02 * scale, palmar * (item.cradle.radius + PALM_HALF_THICKNESS * scale + 0.004));
       rt.held.ease = { from, to, t0: performance.now() / 1000 };
+      // the cradled ball is part of the hand now: it's kept out of things with it, and the fingers wrap it
+      const r = item.cradle.radius;
+      heldSpheres[hand] = () => ({ c: body.translation(), r });
     }
     item.onGrab?.(hand);
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
@@ -315,6 +320,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     if ((swaps - seenSwaps.current) % 2 !== 0) {
       const H = hands.current;
       [H.Left, H.Right] = [H.Right, H.Left];
+      swapHeldSpheres();
       handStore.setState((s) => ({ holding: { Left: s.holding.Right, Right: s.holding.Left } }));
     }
     seenSwaps.current = swaps;
