@@ -11,6 +11,7 @@ import type { Point } from "@/lib/hand/types";
 import { ASSIST_STRENGTH, useArcade } from "./arcadeStore";
 import { makeBallTexture } from "./ballTexture";
 import { hoopOffset, RIM } from "./Hoop";
+import { useObstacle } from "@/state/obstacles";
 
 export const BALL_RADIUS = 0.12;
 /** The rack sits dead centre, in front of the hoop. */
@@ -44,6 +45,11 @@ function Ball({ index, texture }: { index: number; texture: THREE.Texture }) {
   const rt = balls[index];
   const ref = useRef<RapierRigidBody>(null);
   const threw = useArcade((s) => s.threw);
+  // a resting or flying ball is solid to the hands (a held one moves with its hand instead)
+  useObstacle(`ball-${index}`, () => {
+    const b = ref.current;
+    return b && rt.state !== "held" ? { kind: "sphere", c: b.translation(), r: BALL_RADIUS } : null;
+  });
 
   useEffect(() => {
     rt.body = ref.current;
@@ -197,6 +203,8 @@ function Respawner() {
 
 export function Balls() {
   const texture = useMemo(() => makeBallTexture(), []);
+  useObstacle("rack", () => ({ kind: "box", c: { x: RACK.x, y: RACK.y, z: RACK.z }, h: { x: 0.42, y: 0.015, z: 0.16 } }));
+  useObstacle("rack-stand", () => ({ kind: "box", c: { x: RACK.x, y: RACK.y / 2, z: RACK.z }, h: { x: 0.05, y: RACK.y / 2, z: 0.05 } }));
   return (
     <>
       {/* the rack: a chrome shelf in the centre, with a cradle for each ball */}
