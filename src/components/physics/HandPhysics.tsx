@@ -48,6 +48,12 @@ export interface Grabbable {
   restGroups?: number;
   /** Collision groups while held (default: GROUPS.held). */
   heldGroups?: number;
+  /**
+   * Sit the object in the palm when grabbed (fixed attachments): it eases to rest against the palm
+   * side, `radius` from the palm surface, instead of staying wherever it was caught (anywhere from
+   * inside the hand to 24 cm off it).
+   */
+  cradle?: { radius: number };
   /** For spring attachments: the grab point on the body, in its local frame. */
   localHandle?: Point;
   /** Give the object the hand's velocity on release. */
@@ -90,6 +96,9 @@ const GRAB_GRACE = 0.3;
 /** Smoothing for the continuous grip value used by grip-based grabbing. */
 const GRIP_TAU = 0.06;
 const PARKED = { x: 0, y: -50, z: 0 };
+/** Half the palm's thickness (real-hand metres, as drawn), and how long a cradled object takes to settle in. */
+const PALM_HALF_THICKNESS = 0.017;
+const CRADLE_EASE = 0.12;
 
 interface HandRuntime {
   palm: RapierRigidBody | null;
@@ -101,7 +110,14 @@ interface HandRuntime {
   grabWindowUntil: number;
   /** Grip (0 open … 1 fist), smoothed so a jittery frame can't drop or snatch a ball. */
   grip: number;
-  held: { item: Grabbable; joint: ImpulseJoint | null; point: GripPoint; drive?: { offset: THREE.Vector3; rot: THREE.Quaternion } } | null;
+  held: {
+    item: Grabbable;
+    joint: ImpulseJoint | null;
+    point: GripPoint;
+    drive?: { offset: THREE.Vector3; rot: THREE.Quaternion };
+    /** A cradled object easing into the palm: joint anchor from → to over CRADLE_EASE. */
+    ease?: { from: THREE.Vector3; to: THREE.Vector3; t0: number };
+  } | null;
   /** The hand's motion history, kept so a hand that vanishes mid-throw can still throw. */
   lastHistory: MotionHistory | null;
   /** Something was held while the tracker had lost the hand (counts a save if it comes back). */
@@ -248,6 +264,13 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     if (item.switchGroups !== false) setGroups(body, item.heldGroups ?? GROUPS.held);
     body.wakeUp();
     rt.held = { item, joint, point };
+    if (item.cradle && params.anchor1) {
+      // The palm frame's z is the palm side for a right hand and the back for a left one.
+      const palmar = hand === "Right" ? 1 : -1;
+      const from = new THREE.Vector3(params.anchor1.x, params.anchor1.y, params.anchor1.z);
+      const to = new THREE.Vector3(0, 0.02 * scale, palmar * (item.cradle.radius + PALM_HALF_THICKNESS * scale + 0.004));
+      rt.held.ease = { from, to, t0: performance.now() / 1000 };
+    }
     item.onGrab?.(hand);
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
   };
@@ -348,6 +371,14 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       const stillHolding = (item: Grabbable) => (item.grip ? rt.grip >= item.grip.release : (item.holdGestures ?? item.gestures).includes(g));
       if (held && held.shouldRelease?.()) release(hand, rt, false);
       else if (held && !stillHolding(held)) release(hand, rt, true);
+      if (rt.held?.ease && rt.held.joint) {
+        const e = rt.held.ease;
+        const u = Math.min(1, (now - e.t0) / CRADLE_EASE);
+        const s = u * u * (3 - 2 * u);
+        rt.held.joint.setAnchor1({ x: e.from.x + (e.to.x - e.from.x) * s, y: e.from.y + (e.to.y - e.from.y) * s, z: e.from.z + (e.to.z - e.from.z) * s });
+        rt.held.item.body()?.wakeUp();
+        if (u >= 1) rt.held.ease = undefined;
+      }
       if (rt.held?.drive) drive(rt, rt.held.item, rt.held.drive, dt);
       else if (!rt.held) {
         const other = hands.current[hand === "Right" ? "Left" : "Right"];
