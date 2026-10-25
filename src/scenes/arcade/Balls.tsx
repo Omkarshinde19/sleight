@@ -59,6 +59,7 @@ function Ball({ index, texture }: { index: number; texture: THREE.Texture }) {
     reach: BALL_RADIUS + 0.12,
     throwable: THROW,
     restGroups: GROUPS.propNoHand,
+    heldGroups: GROUPS.heldFree,
     onGrab: () => {
       rt.state = "held";
       rt.trail = [];

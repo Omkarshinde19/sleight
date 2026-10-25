@@ -18,6 +18,11 @@ export const GROUPS = {
   /** A prop that hands pass through: it only moves when grabbed (no accidental knocks off a rack). */
   propNoHand: interactionGroups(LAYER.PROP, [LAYER.WORLD, LAYER.PROP, LAYER.HELD, LAYER.TOOL, LAYER.ANATOMY]),
   held: interactionGroups(LAYER.HELD, [LAYER.WORLD, LAYER.PROP, LAYER.HELD, LAYER.ANATOMY]),
+  /**
+   * A held prop that touches nothing. Contacts with the rack or other balls fought the grab joint and
+   * made a held ball wobble up to 9 cm in the hand; the hand itself is kept out of solid things instead.
+   */
+  heldFree: interactionGroups(LAYER.HELD, []),
   tool: interactionGroups(LAYER.TOOL, [LAYER.WORLD, LAYER.PROP, LAYER.ANATOMY]),
   anatomy: interactionGroups(LAYER.ANATOMY, [LAYER.PROP, LAYER.HELD, LAYER.TOOL]),
 };

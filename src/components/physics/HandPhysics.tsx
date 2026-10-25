@@ -46,6 +46,8 @@ export interface Grabbable {
   grip?: { grab: number; release: number };
   /** Collision groups to restore after release (default: GROUPS.prop). */
   restGroups?: number;
+  /** Collision groups while held (default: GROUPS.held). */
+  heldGroups?: number;
   /** For spring attachments: the grab point on the body, in its local frame. */
   localHandle?: Point;
   /** Give the object the hand's velocity on release. */
@@ -243,7 +245,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       );
     }
     const joint = world.createImpulseJoint(params, anchor as unknown as RapierBody, body as unknown as RapierBody, true);
-    if (item.switchGroups !== false) setGroups(body, GROUPS.held);
+    if (item.switchGroups !== false) setGroups(body, item.heldGroups ?? GROUPS.held);
     body.wakeUp();
     rt.held = { item, joint, point };
     item.onGrab?.(hand);
