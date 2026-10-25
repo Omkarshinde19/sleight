@@ -192,6 +192,7 @@ function palmQuaternion(J: Point[], out: THREE.Quaternion) {
 export function HandPhysics({ scale = 1.5, children }: { scale?: number; children?: ReactNode }) {
   const registry = useMemo<Registry>(() => new Map(), []);
   const hands = useRef<Record<Handedness, HandRuntime>>({ Right: newRuntime(), Left: newRuntime() });
+  const seenSwaps = useRef(handStore.getState().labelSwaps);
   const { world, rapier } = useRapier();
 
   const release = (hand: Handedness, rt: HandRuntime, throwIt: boolean, history?: MotionHistory | null) => {
@@ -307,6 +308,16 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     const nowMs = performance.now();
     const now = nowMs / 1000;
     const tracked = handStore.getState().hands;
+
+    // The tracker exchanged the hands' labels: swap the runtimes (bodies, what's held) so a held
+    // ball stays in the hand holding it instead of being yanked across to the other one.
+    const swaps = handStore.getState().labelSwaps;
+    if ((swaps - seenSwaps.current) % 2 !== 0) {
+      const H = hands.current;
+      [H.Left, H.Right] = [H.Right, H.Left];
+      handStore.setState((s) => ({ holding: { Left: s.holding.Right, Right: s.holding.Left } }));
+    }
+    seenSwaps.current = swaps;
 
     for (const hand of ["Right", "Left"] as Handedness[]) {
       const rt = hands.current[hand];
