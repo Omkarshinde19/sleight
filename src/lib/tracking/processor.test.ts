@@ -58,3 +58,22 @@ describe("HandProcessor on the real demo recording", () => {
     expect(p.process({ t: t + COAST_MS + 50, aspect: 1.5, hands: [] }).Right).toBeUndefined();
   });
 });
+
+describe("HandProcessor when the hands' labels are exchanged", () => {
+  it("keeps each hand where it was: no jump across the scene", () => {
+    // a lone right hand mislabelled "Left" (as MediaPipe often does), then the left hand comes in
+    const start = frames.findIndex((f) => f.hands.length === 2);
+    const pair = frames.slice(start, start + 60);
+    const alone = pair.slice(0, 15).map((f) => {
+      const right = f.hands.find((h) => h.handedness === "Right")!;
+      return { ...f, hands: [{ ...right, handedness: "Left" as Handedness }] };
+    });
+    let swaps = 0;
+    const p = new HandProcessor(undefined, undefined, () => swaps++);
+    const out = [...alone, ...pair.slice(15)].map((f) => p.process(f));
+    expect(swaps).toBe(1);
+    const lastAlone = out[14].Left!.palm;
+    const firstPair = out[15].Right!.palm;
+    expect(Math.hypot(firstPair.x - lastAlone.x, firstPair.y - lastAlone.y)).toBeLessThan(0.1);
+  });
+});

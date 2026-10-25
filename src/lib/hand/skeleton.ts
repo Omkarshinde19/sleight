@@ -104,6 +104,11 @@ export class Skeleton {
     return out;
   }
 
+  /** The hand's label changed: what was measured under the old label holds with the sign flipped. */
+  relabel() {
+    this.flip();
+  }
+
   private flip() {
     this.flipped = !this.flipped;
     // the average was measured with the old sign

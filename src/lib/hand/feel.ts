@@ -131,6 +131,11 @@ export class FeelMeter {
     }
   }
 
+  /** The hands' labels were exchanged: keep each hand's history with it. */
+  swap() {
+    [this.hands.Left, this.hands.Right] = [this.hands.Right, this.hands.Left];
+  }
+
   /** The hand left (or was reset); a later detection is a new appearance, not a gap. */
   forget(hand: Handedness) {
     this.hands[hand].lastSeen = null;

@@ -114,6 +114,8 @@ export class HandProcessor {
   constructor(
     public workspace: Workspace = DEFAULT_WORKSPACE,
     public feel: FeelMeter = new FeelMeter(COAST_MS),
+    /** Told when the two hands' labels are exchanged, so state kept per label elsewhere can follow. */
+    private onSwap?: () => void,
   ) {
     this.wireTracker();
   }
@@ -121,6 +123,14 @@ export class HandProcessor {
   private wireTracker() {
     this.tracker.onFlip = () => this.feel.labelFlip();
     this.tracker.onFix = () => this.feel.labelFix();
+    // A relabel moves everything learnt about a hand (filters, skeleton, history) with that hand.
+    this.tracker.onSwap = () => {
+      [this.channels.Left, this.channels.Right] = [this.channels.Right, this.channels.Left];
+      this.channels.Left.skeleton.relabel();
+      this.channels.Right.skeleton.relabel();
+      this.feel.swap();
+      this.onSwap?.();
+    };
   }
 
   /**
