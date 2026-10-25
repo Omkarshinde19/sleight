@@ -8,6 +8,8 @@ import { HandProcessor } from "@/lib/tracking/processor";
 import { SimulatedSource } from "@/lib/tracking/simulated";
 import type { Recording, TrackingSource } from "@/lib/tracking/source";
 import type { RawFrame } from "@/lib/hand/types";
+import { feel } from "@/state/feel";
+import { handPose } from "@/state/handPose";
 import { handStore } from "@/state/handStore";
 
 interface TrackingApi {
@@ -80,7 +82,7 @@ export function HandTrackingProvider({
   surface: React.RefObject<HTMLElement | null>;
 }) {
   const sourceRef = useRef<TrackingSource | null>(null);
-  const processor = useMemo(() => new HandProcessor(workspace), [workspace]);
+  const processor = useMemo(() => new HandProcessor(workspace, feel), [workspace]);
   const recorder = useMemo(() => new Recorder(), []);
   const lastFrameT = useRef(0);
   const [sim, setSim] = useState<SimulatedSource | null>(null);
@@ -90,6 +92,8 @@ export function HandTrackingProvider({
     (frame: RawFrame) => {
       recorder.push(frame);
       const hands = processor.process(frame);
+      // stamped on arrival: render and physics interpolate on the page's clock, whatever the source's
+      handPose.push(hands, performance.now());
       const s = handStore.getState();
       // Exponential moving averages so the numbers in the overlay are readable.
       const last = lastFrameT.current;
@@ -110,6 +114,7 @@ export function HandTrackingProvider({
     sourceRef.current = null;
     setSim(null);
     setVideo(null);
+    handPose.reset();
     handStore.setState({ source: null, status: "idle", hands: {}, delegate: null, holding: {} });
   }, []);
 
@@ -121,12 +126,14 @@ export function HandTrackingProvider({
       // Fresh filters and calibration per session; the camera also restores the saved depth reference.
       processor.reset();
       processor.setPersistence(source.kind === "camera");
+      processor.setSynthetic(source.kind === "sim");
       if (source instanceof CameraSource)
         source.onError = (message) => {
           if (sourceRef.current !== source) return;
           source.stop();
           sourceRef.current = null;
           setVideo(null);
+          handPose.reset();
           handStore.setState({ status: "error", error: message, source: null, hands: {} });
         };
       try {
@@ -179,7 +186,7 @@ export function HandTrackingProvider({
   // A handle for automated browser checks and the console: window.__sleight.sim.throwFlick()
   useEffect(() => {
     const w = window as unknown as { __sleight?: Record<string, unknown> };
-    w.__sleight = { ...(w.__sleight ?? {}), api, store: handStore };
+    w.__sleight = { ...(w.__sleight ?? {}), api, store: handStore, feel };
   }, [api]);
 
   return <TrackingContext.Provider value={api}>{children}</TrackingContext.Provider>;
