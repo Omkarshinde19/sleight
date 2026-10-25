@@ -5,6 +5,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { FINGERS, LM, type Handedness, type Point } from "@/lib/hand/types";
 import { makeChromeMaterial } from "@/lib/materials/chrome";
+import { handPose } from "@/state/handPose";
 import { handStore } from "@/state/handStore";
 
 /*
@@ -206,7 +207,8 @@ export function ChromeHand({
     if (!group.current) return;
     group.current.visible = !!h;
     if (!h) return;
-    const J = h.joints.map((p) => toV(p));
+    // the interpolated pose (smooth at any frame rate, and exactly where the physics colliders are)
+    const J = (handPose.sample(hand) ?? h).joints.map((p) => toV(p));
     const s = scale;
 
     // Palm frame: across the knuckles, toward the fingers, and the back of the hand (dorsal).
