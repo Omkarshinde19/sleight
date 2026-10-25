@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
+type P = { x: number; y: number; z: number };
+type Body = { translation(): P; numColliders(): number; isKinematic(): boolean };
+type W = {
+  __arcadeBalls: { body: Body }[];
+  __st: { grabs: number; fingersInBall: number; worstDrift: number };
+  __sleight: {
+    api: { startPlayback(r: unknown): void };
+    store: { getState(): { holding: Record<string, string | null> } };
+    pose: { sample(h: string): { joints: P[]; palm: P } | null };
+    rapier: { world: { forEachRigidBody(f: (b: Body) => void): void } };
+  };
+};
+
 /**
  * A real arcade session (webcam landmarks only) played back in the scene: the bugs it showed were
  * robot fingers inside the balls, held balls wobbling or slipping in the hand, and the hands swapping.
@@ -11,18 +24,18 @@ test("replaying a real session: hands stay out of the balls and held balls stay 
   const t0 = rec.frames[0].t;
   rec.frames = rec.frames.filter((f: { t: number }) => f.t - t0 < 16_000);
   await page.goto("/arcade");
-  await page.waitForFunction(() => (window as any).__arcadeBalls?.[2]?.body && (window as any).__sleight?.api);
+  await page.waitForFunction(() => (window as unknown as Partial<W>).__arcadeBalls?.[2]?.body && (window as unknown as Partial<W>).__sleight?.api);
   await page.evaluate((r) => {
-    const w = window as any;
+    const w = window as unknown as W;
     const st = { grabs: 0, fingersInBall: 0, worstDrift: 0 };
     w.__st = st;
     const prev: Record<string, string | null> = {};
     const held: Record<string, number | null> = {};
     const tick = () => {
       const s = w.__sleight.store.getState();
-      const balls = w.__arcadeBalls.map((b: any) => b.body.translation());
-      const anchors: any[] = [];
-      w.__sleight.rapier.world.forEachRigidBody((b: any) => b.numColliders() === 0 && b.isKinematic() && anchors.push(b.translation()));
+      const balls = w.__arcadeBalls.map((b) => b.body.translation());
+      const anchors: P[] = [];
+      w.__sleight.rapier.world.forEachRigidBody((b) => void (b.numColliders() === 0 && b.isKinematic() && anchors.push(b.translation())));
       for (const h of ["Right", "Left"]) {
         const hold = s.holding[h] ?? null;
         if (hold && !prev[h]) {
@@ -33,8 +46,8 @@ test("replaying a real session: hands stay out of the balls and held balls stay 
         const p = w.__sleight.pose.sample(h);
         if (!p) continue;
         const i = hold ? Number(hold.split(" ")[1]) - 1 : -1;
-        p.joints.forEach((j: any) =>
-          balls.forEach((b: any, k: number) => {
+        p.joints.forEach((j) =>
+          balls.forEach((b, k) => {
             if (k !== i && Math.hypot(j.x - b.x, j.y - b.y, j.z - b.z) < 0.12 - 0.005) st.fingersInBall++;
           }),
         );
@@ -54,7 +67,7 @@ test("replaying a real session: hands stay out of the balls and held balls stay 
     w.__sleight.api.startPlayback(r);
   }, rec);
   await page.waitForTimeout(16_500);
-  const st = await page.evaluate(() => (window as any).__st);
+  const st = await page.evaluate(() => (window as unknown as W).__st);
   expect(st.grabs).toBeGreaterThanOrEqual(2);
   expect(st.fingersInBall).toBe(0);
   expect(st.worstDrift).toBeLessThan(0.01);
