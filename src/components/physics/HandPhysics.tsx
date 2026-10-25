@@ -6,8 +6,10 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import * as THREE from "three";
 import { isGrabGesture } from "@/lib/hand/gestures";
 import { LM, type Gesture, type Handedness, type Point } from "@/lib/hand/types";
-import { throwVelocity, type ThrowOptions } from "@/lib/hand/velocity";
+import { throwVelocity, type MotionHistory, type ThrowOptions } from "@/lib/hand/velocity";
 import { GROUPS } from "@/lib/physics/groups";
+import { feel } from "@/state/feel";
+import { handPose } from "@/state/handPose";
 import { handStore } from "@/state/handStore";
 
 export interface ReleaseInfo {
@@ -79,8 +81,8 @@ export function useGrabbable(def: Grabbable) {
 const PALM_RADIUS = 0.034;
 const TIP_RADIUS = 0.0095;
 const TIPS = [LM.THUMB_TIP, LM.INDEX_TIP, LM.MIDDLE_TIP, LM.RING_TIP, LM.PINKY_TIP];
-/** Physics follows the (30 Hz) tracker with this time constant, so kinematic bodies move smoothly at 90 Hz. */
-const FOLLOW_TAU = 0.03;
+/** A jump bigger than this in one step is a tracking glitch: teleport rather than sweep through things. */
+const GLITCH_JUMP = 0.3;
 /** A grab gesture can pick something up this long after it forms (forming a fist just before contact). */
 const GRAB_GRACE = 0.3;
 /** Smoothing for the continuous grip value used by grip-based grabbing. */
@@ -91,14 +93,38 @@ interface HandRuntime {
   palm: RapierRigidBody | null;
   tips: (RapierRigidBody | null)[];
   anchor: RapierRigidBody | null;
-  pos: THREE.Vector3[]; // smoothed: palm, 5 tips, anchor
+  pos: THREE.Vector3[]; // palm, 5 tips, anchor (from the interpolated pose)
   rot: THREE.Quaternion;
   prevGesture: Gesture;
   grabWindowUntil: number;
   /** Grip (0 open … 1 fist), smoothed so a jittery frame can't drop or snatch a ball. */
   grip: number;
-  held: { item: Grabbable; joint: ImpulseJoint | null; drive?: { offset: THREE.Vector3; rot: THREE.Quaternion } } | null;
+  held: { item: Grabbable; joint: ImpulseJoint | null; point: GripPoint; drive?: { offset: THREE.Vector3; rot: THREE.Quaternion } } | null;
+  /** The hand's motion history, kept so a hand that vanishes mid-throw can still throw. */
+  lastHistory: MotionHistory | null;
+  /** Something was held while the tracker had lost the hand (counts a save if it comes back). */
+  heldThroughLoss: boolean;
 }
+
+/**
+ * Where on the hand a held object is attached, chosen once at grab time. (It used to follow the
+ * tracker's gesture, so a claw passing through "pinch" for a frame or two yanked the ball ~14 cm to
+ * the thumb–index midpoint.)
+ */
+type GripPoint = "palm" | "pinch";
+interface Pose {
+  joints: Point[];
+  palm: Point;
+  grip: Point;
+}
+const gripPoint = (pose: Pose, point: GripPoint): Point =>
+  point === "palm"
+    ? pose.palm
+    : {
+        x: (pose.joints[LM.THUMB_TIP].x + pose.joints[LM.INDEX_TIP].x) / 2,
+        y: (pose.joints[LM.THUMB_TIP].y + pose.joints[LM.INDEX_TIP].y) / 2,
+        z: (pose.joints[LM.THUMB_TIP].z + pose.joints[LM.INDEX_TIP].z) / 2,
+      };
 
 /** Where each driven (tool) item is being steered to: what the hand wants, before contacts. */
 export const driveTargets = new Map<string, { position: THREE.Vector3; quaternion: THREE.Quaternion }>();
@@ -113,6 +139,8 @@ const newRuntime = (): HandRuntime => ({
   grabWindowUntil: 0,
   grip: 0,
   held: null,
+  lastHistory: null,
+  heldThroughLoss: false,
 });
 
 /** Tool steering: time constant and speed limits. */
@@ -148,7 +176,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
   const hands = useRef<Record<Handedness, HandRuntime>>({ Right: newRuntime(), Left: newRuntime() });
   const { world, rapier } = useRapier();
 
-  const release = (hand: Handedness, rt: HandRuntime, throwIt: boolean) => {
+  const release = (hand: Handedness, rt: HandRuntime, throwIt: boolean, history?: MotionHistory | null) => {
     if (!rt.held) return;
     const { item, joint } = rt.held;
     rt.held = null;
@@ -156,9 +184,9 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     driveTargets.delete(item.id);
     const body = item.body();
     if (item.attach === "drive") body?.setGravityScale(1, true);
-    const tracked = handStore.getState().hands[hand];
+    const motion = history ?? handStore.getState().hands[hand]?.history;
     let velocity: Point = { x: 0, y: 0, z: 0 };
-    if (throwIt && item.throwable && tracked) velocity = throwVelocity(tracked.history, item.throwable);
+    if (throwIt && item.throwable && motion) velocity = throwVelocity(motion, item.throwable);
     const override = item.onRelease?.({ hand, velocity });
     if (body) {
       if (item.throwable) {
@@ -173,11 +201,18 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: null } }));
   };
 
-  const grab = (hand: Handedness, rt: HandRuntime, item: Grabbable) => {
+  const grab = (hand: Handedness, rt: HandRuntime, item: Grabbable, pose: Pose, gesture: Gesture) => {
     const body = item.body();
     const anchor = rt.anchor;
     if (!body || !anchor) return;
-    const a = anchor.translation();
+    // cradled objects hang off the palm; pinched ones off the fingertips
+    const point: GripPoint = !item.grip && gesture === "pinch" ? "pinch" : "palm";
+    const at = gripPoint(pose, point);
+    rt.pos[6].set(at.x, at.y, at.z);
+    anchor.setTranslation(at, false);
+    anchor.setRotation(rt.rot, false);
+    anchor.setNextKinematicTranslation(at);
+    const a = at;
     const inv = qTmp.copy(rt.rot).invert();
     if (item.attach === "drive") {
       // Steered from the palm, which (unlike the grip point) doesn't jump between pinch and fist.
@@ -186,7 +221,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       const offset = new THREE.Vector3(o.x - rt.pos[0].x, o.y - rt.pos[0].y, o.z - rt.pos[0].z).applyQuaternion(inv);
       const rot = inv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w));
       body.setGravityScale(0, true);
-      rt.held = { item, joint: null, drive: { offset, rot } };
+      rt.held = { item, joint: null, point, drive: { offset, rot } };
       item.onGrab?.(hand);
       handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
       return;
@@ -210,7 +245,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
     const joint = world.createImpulseJoint(params, anchor as unknown as RapierBody, body as unknown as RapierBody, true);
     if (item.switchGroups !== false) setGroups(body, GROUPS.held);
     body.wakeUp();
-    rt.held = { item, joint };
+    rt.held = { item, joint, point };
     item.onGrab?.(hand);
     handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
   };
@@ -244,8 +279,8 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
 
   useBeforePhysicsStep((w) => {
     const dt = w.timestep;
-    const k = 1 - Math.exp(-dt / FOLLOW_TAU);
-    const now = performance.now() / 1000;
+    const nowMs = performance.now();
+    const now = nowMs / 1000;
     const tracked = handStore.getState().hands;
 
     for (const hand of ["Right", "Left"] as Handedness[]) {
@@ -253,7 +288,14 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
       const h = tracked[hand];
       const bodies = [rt.palm, ...rt.tips, rt.anchor];
       if (!h) {
-        if (rt.held) release(hand, rt, false);
+        // Gone for longer than the processor coasts: let go, as a throw if the hand was moving fast
+        // (a flick blurs the hand, and that's often when the tracker loses it).
+        if (rt.held) {
+          feel.lossDrop();
+          release(hand, rt, true, rt.lastHistory);
+        }
+        rt.heldThroughLoss = false;
+        rt.lastHistory = null;
         rt.prevGesture = "none";
         rt.grip = 0;
         // Teleport (not a kinematic move): sweeping to the parking spot in one step would
@@ -263,22 +305,36 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
         continue;
       }
 
-      // Smoothly follow the tracked joints. A hand that just appeared is teleported in, for the same reason.
-      const targets = [h.palm, ...TIPS.map((i) => h.joints[i]), h.grip];
-      const appeared = rt.pos[0].y < -40;
+      // Follow the same interpolated pose the robot hand is drawn with. A hand that just appeared (or
+      // jumped implausibly far) is teleported in, for the same reason as above.
+      const pose = handPose.sample(hand, nowMs) ?? h;
+      const targets = [pose.palm, ...TIPS.map((i) => pose.joints[i]), rt.held ? gripPoint(pose, rt.held.point) : pose.grip];
+      const teleport = rt.pos[0].y < -40 || rt.pos[0].distanceTo(vA.set(pose.palm.x, pose.palm.y, pose.palm.z)) > GLITCH_JUMP;
       rt.pos.forEach((p, i) => {
         const t = targets[i];
-        if (appeared) {
-          p.set(t.x, t.y, t.z);
-          bodies[i]?.setTranslation(p, false);
-        } else p.lerp(vA.set(t.x, t.y, t.z), k);
+        p.set(t.x, t.y, t.z);
+        if (teleport) bodies[i]?.setTranslation(p, false);
       });
-      rt.rot.slerp(palmQuaternion(h.joints, qTmp), k);
+      palmQuaternion(pose.joints, rt.rot);
+      rt.lastHistory = h.history;
       rt.palm?.setNextKinematicTranslation(rt.pos[0]);
       rt.palm?.setNextKinematicRotation(rt.rot);
       rt.tips.forEach((b, i) => b?.setNextKinematicTranslation(rt.pos[i + 1]));
       rt.anchor?.setNextKinematicTranslation(rt.pos[6]);
       rt.anchor?.setNextKinematicRotation(rt.rot);
+
+      // While the tracker has lost the hand (coasting), keep whatever it holds and grab nothing new:
+      // its gesture and grip are just the last ones seen.
+      if (h.lost) {
+        if (rt.held) rt.heldThroughLoss = true;
+        if (rt.held?.item.shouldRelease?.()) release(hand, rt, false);
+        else if (rt.held?.drive) drive(rt, rt.held.item, rt.held.drive, dt);
+        continue;
+      }
+      if (rt.heldThroughLoss) {
+        if (rt.held) feel.coastSave();
+        rt.heldThroughLoss = false;
+      }
 
       // Grab / release
       const g = h.gesture;
@@ -305,14 +361,14 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
           if (!b) continue;
           const p = item.grabPoint?.() ?? b.translation();
           // for a cradled object the palm counts as much as the grip point
-          const from = item.grip ? h.palm : h.grip;
+          const from = item.grip ? pose.palm : pose.grip;
           const d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
           if (d < item.reach && d < bestD) {
             best = item;
             bestD = d;
           }
         }
-        if (best) grab(hand, rt, best);
+        if (best) grab(hand, rt, best, pose, g);
       }
     }
   });
