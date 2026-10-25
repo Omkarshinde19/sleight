@@ -3,6 +3,7 @@ import { FeelMeter } from "../hand/feel";
 import type { Handedness, RawFrame } from "../hand/types";
 import { COAST_MS, HandProcessor } from "./processor";
 import demo from "../../../public/sessions/demo.json";
+import arcade from "../hand/__fixtures__/arcade-session.json";
 
 /** The committed demo session: 38 s of a real MacBook webcam through MediaPipe, both hands. */
 const frames = (demo as { frames: RawFrame[] }).frames;
@@ -75,5 +76,42 @@ describe("HandProcessor when the hands' labels are exchanged", () => {
     const lastAlone = out[14].Left!.palm;
     const firstPair = out[15].Right!.palm;
     expect(Math.hypot(firstPair.x - lastAlone.x, firstPair.y - lastAlone.y)).toBeLessThan(0.1);
+  });
+});
+
+describe("HandProcessor on a real arcade session (two hands, grabs and throws)", () => {
+  // 47 s from a MacBook webcam; the right hand enters alone, mislabelled "Left" by MediaPipe.
+  const session = (arcade as { frames: RawFrame[] }).frames;
+
+  it("never jumps a hand across the scene, though the tracker mislabels hands", () => {
+    let swaps = 0;
+    const p = new HandProcessor(undefined, undefined, () => swaps++);
+    const swappedAt = new Set<number>();
+    const frames = session.map((f, i) => {
+      const before = swaps;
+      const out = p.process(f);
+      if (swaps !== before) swappedAt.add(i);
+      return out;
+    });
+    // the lone mislabelled hand is relabelled once, when the other hand comes in (state moves with it)
+    expect(swaps).toBe(1);
+    const other = (h: Handedness): Handedness => (h === "Left" ? "Right" : "Left");
+    for (const h of ["Left", "Right"] as Handedness[]) {
+      for (let i = 1; i < frames.length; i++) {
+        // follow the physical hand: across a relabel it carries on under the other label
+        const a = frames[i - 1][swappedAt.has(i) ? other(h) : h];
+        const b = frames[i][h];
+        // fast throws move the palm ~15 cm a frame; a swap moved it ~40 cm sideways
+        if (a && b) expect(Math.abs(a.palm.x - b.palm.x)).toBeLessThan(0.2);
+      }
+    }
+  });
+
+  it("puts the right hand on the right once both hands are in view", () => {
+    const p = new HandProcessor();
+    const frames = session.map((f) => p.process(f));
+    const both = frames.filter((f) => f.Left && f.Right && !f.Left.lost && !f.Right.lost);
+    const wrongSide = both.filter((f) => f.Right!.palm.x < f.Left!.palm.x).length;
+    expect(wrongSide / both.length).toBeLessThan(0.01);
   });
 });
