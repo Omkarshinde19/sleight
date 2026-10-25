@@ -161,8 +161,10 @@ The tracker model and WASM are cached as immutable assets (`next.config.ts`).
 - **Refreshing:** the tab remembers that it was using the camera and resumes it if permission is already
   granted. Depth calibration is taken from steady frames only, saved, and restored after a reload. If
   the camera is still held by the previous page, it retries a few times.
-- **Known limits:** robot hands can visually pass through furniture (only tools are physically blocked).
-  Tracking is weakest with strong backlight and side-on pinches. A tool glancing the patient at full
+- **Known limits:** in the Arcade the robot hands are kept out of the rack, its stand, the balls and the
+  floor (a cyan ghost shows where your real hand is), but in the Industrial and Theatre scenes they can
+  still pass through the furniture: an upright webcam hand has to dip below the workbench to pinch a chip
+  off it, so blocking the bench would make the chip unreachable. Tracking is weakest with strong backlight and side-on pinches. A tool glancing the patient at full
   speed can momentarily overlap by a few mm before the solver pushes it out (shown as *max* in the
   Theatre HUD).
 

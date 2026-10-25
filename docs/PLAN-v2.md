@@ -17,6 +17,19 @@ in scope; it's B6/depth noise). Also fixed on the way: the grab anchor followed 
 passing through "pinch" for a frame yanked a held ball ~14 cm; the anchor point is now chosen at grab
 time. Still to do: the three webcam reference recordings (needs your camera, `R` in camera mode).
 
+**Update (2026-10-26), from a recorded arcade session** (`src/lib/hand/__fixtures__/arcade-session.json`):
+- Held balls slipped because they still collided with the rack and the other balls, fighting the grab
+  joint (up to 9 cm). Held balls now touch nothing; the hand carrying them is kept clear instead.
+- Balls were caught 2.5–24 cm from the palm; they now ease into the palm (cradle).
+- A lone hand mislabelled by MediaPipe kept its label until both hands swapped ~0.1 s later. The pair is
+  now labelled when the second hand appears (raw labels + which side of the frame), and any relabel moves
+  all per-hand state (filters, skeleton, poses, what's held) with the physical hand.
+- A1 done early for the Arcade: the robot hand is pushed rigidly out of the rack, stand, balls and floor,
+  with a ghost of the real hand; fingers wrap a held ball. Fingers inside resting balls: 934 → 0 frames;
+  inside the held ball: 1325 → 13.
+- Industrial furniture is not blocked yet: upright webcam hands pinch chips with the palm below the bench
+  top. Needs a layout change (raise the tray and socket) or fingers-first blocking.
+
 ## 0. Measure first (½ day)
 
 "Feels stupid" is not testable. Add a **Feel** panel to the debug overlay, fed by the processor:
