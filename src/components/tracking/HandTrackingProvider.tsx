@@ -131,6 +131,7 @@ export function HandTrackingProvider({
       handStore.setState({ source: source.kind, status: "loading", error: null });
       // Fresh filters and calibration per session; the camera also restores the saved depth reference.
       processor.reset();
+      handPose.handScale = processor.workspace.handScale;
       processor.setPersistence(source.kind === "camera");
       processor.setSynthetic(source.kind === "sim");
       if (source instanceof CameraSource)
@@ -192,7 +193,7 @@ export function HandTrackingProvider({
   // A handle for automated browser checks and the console: window.__sleight.sim.throwFlick()
   useEffect(() => {
     const w = window as unknown as { __sleight?: Record<string, unknown> };
-    w.__sleight = { ...(w.__sleight ?? {}), api, store: handStore, feel };
+    w.__sleight = { ...(w.__sleight ?? {}), api, store: handStore, feel, pose: handPose };
   }, [api]);
 
   return <TrackingContext.Provider value={api}>{children}</TrackingContext.Provider>;
