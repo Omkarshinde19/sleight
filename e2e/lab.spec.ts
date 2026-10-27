@@ -24,3 +24,22 @@ test("the demo recording plays without a camera", async ({ page }) => {
   await page.waitForFunction(() => Object.keys(window.__sleight.store.getState().hands).length > 0);
   await expect(page.getByText("Recording", { exact: true })).toBeVisible();
 });
+
+test("the Blender reference box loads at the exported scale and orientation", async ({ page }) => {
+  await openWithSim(page, "/lab");
+  const handle = await page.waitForFunction(() => {
+    const three = (window.__sleight as unknown as undefined | { three?: { scene: import("three").Scene } })?.three;
+    const box = three?.scene.getObjectByName("SmokeBox");
+    if (!box) return null;
+    box.updateWorldMatrix(true, false);
+    const geo = (box as import("three").Mesh).geometry;
+    geo.computeBoundingBox();
+    const b = geo.boundingBox!.clone().applyMatrix4(box.matrixWorld);
+    return { min: b.min.toArray(), max: b.max.toArray() };
+  });
+  const { min, max } = (await handle.jsonValue())!;
+  const size = max.map((v, i) => v - min[i]);
+  const centre = max.map((v, i) => (v + min[i]) / 2);
+  [0.2, 0.05, 0.1].forEach((v, i) => expect(size[i]).toBeCloseTo(v, 2));
+  [0, 0.5, -0.3].forEach((v, i) => expect(centre[i]).toBeCloseTo(v, 2));
+});

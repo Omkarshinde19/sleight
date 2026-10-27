@@ -1,10 +1,12 @@
 "use client";
 
 import { RigidBody } from "@react-three/rapier";
+import { Suspense } from "react";
+import { SmokeModel } from "@/components/assets/SmokeModel";
 import { Floor } from "@/components/scene/Floor";
 import { SceneShell } from "@/components/scene/SceneShell";
 
-/** M1 test bench: the hands, a floor and a few blocks. */
+/** M1 test bench: the hands, a floor, a few blocks and the Blender pipeline's reference box. */
 export default function LabScene() {
   return (
     <SceneShell debug title="Lab" brief="A bare bench for checking tracking: move, pinch, make a fist, point." demo="/sessions/demo.json">
@@ -17,6 +19,9 @@ export default function LabScene() {
           </mesh>
         </RigidBody>
       ))}
+      <Suspense fallback={null}>
+        <SmokeModel />
+      </Suspense>
     </SceneShell>
   );
 }
