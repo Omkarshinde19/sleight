@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { classifyInstant, handFeatures } from "./gestures";
 import { BONE_TREE, limitJoint, Skeleton } from "./skeleton";
 import { POSES, synthHand } from "./synth";
-import { dist, LM, norm, sub, type Handedness, type Point } from "./types";
+import { dist, LM, norm, sub, type Handedness, type Point, type RawFrame } from "./types";
 import gestures from "./__fixtures__/clip-gestures.json";
+import arcade from "./__fixtures__/arcade-session.json";
+import { HandProcessor } from "../tracking/processor";
 
 const toPoints = (w: number[][]) => w.map(([x, y, z]) => ({ x, y, z }));
 const synth = (handedness: Handedness, pose = POSES.open) => synthHand({ handedness, pose, imageX: 0.5, imageY: 0.5, distance: 0.5 }).worldLandmarks;
@@ -67,5 +69,26 @@ describe("Skeleton", () => {
       curled = handFeatures(out).grip;
     }
     expect(curled).toBeGreaterThan(0.85);
+  });
+
+  it("recovers when a relabel leaves the flexion sign wrong (recorded arcade session)", () => {
+    // The tracker relabels both hands in the first frames; the skeleton used to stay flipped the
+    // wrong way for the rest of the session, so every fist curled outwards.
+    const p = new HandProcessor();
+    const chans = (p as unknown as { channels: Record<Handedness, { skeleton: { flipped: boolean } }> }).channels;
+    let flippedFrames = 0;
+    let curled = 0;
+    for (const f of (arcade as unknown as { frames: RawFrame[] }).frames) {
+      const out = p.process(f);
+      for (const h of ["Left", "Right"] as Handedness[]) {
+        const o = out[h];
+        if (!o || o.lost) continue;
+        if (chans[h].skeleton.flipped) flippedFrames++;
+        if (handFeatures(o.joints).grip > 0.7) curled++;
+      }
+    }
+    // a relabel at the start can set it wrong for a moment; it must find its way back
+    expect(flippedFrames).toBeLessThan(40);
+    expect(curled).toBeGreaterThan(300);
   });
 });
