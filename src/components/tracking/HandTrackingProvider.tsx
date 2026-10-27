@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Workspace } from "@/lib/hand/mapping";
 import { CameraError, CameraSource } from "@/lib/tracking/camera";
 import { downloadRecording, PlaybackSource, Recorder } from "@/lib/tracking/playback";
+import { FrameClock } from "@/lib/tracking/frameClock";
 import { HandProcessor } from "@/lib/tracking/processor";
 import { SimulatedSource } from "@/lib/tracking/simulated";
 import type { Recording, TrackingSource } from "@/lib/tracking/source";
@@ -91,6 +92,7 @@ export function HandTrackingProvider({
   const processor = useMemo(() => new HandProcessor(workspace, feel, onLabelSwap), [workspace]);
   const recorder = useMemo(() => new Recorder(), []);
   const lastFrameT = useRef(0);
+  const clock = useMemo(() => new FrameClock(), []);
   const [sim, setSim] = useState<SimulatedSource | null>(null);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
 
@@ -98,8 +100,8 @@ export function HandTrackingProvider({
     (frame: RawFrame) => {
       recorder.push(frame);
       const hands = processor.process(frame);
-      // stamped on arrival: render and physics interpolate on the page's clock, whatever the source's
-      handPose.push(hands, performance.now());
+      // page-clock stamps that keep the source's spacing (see FrameClock)
+      handPose.push(hands, clock.stamp(frame.t, performance.now()));
       const s = handStore.getState();
       // Exponential moving averages so the numbers in the overlay are readable.
       const last = lastFrameT.current;
@@ -112,7 +114,7 @@ export function HandTrackingProvider({
         calibrating: processor.isCalibrating,
       });
     },
-    [processor, recorder],
+    [processor, recorder, clock],
   );
 
   const stop = useCallback(() => {
@@ -128,6 +130,7 @@ export function HandTrackingProvider({
     async (source: TrackingSource) => {
       stop();
       sourceRef.current = source;
+      clock.reset();
       handStore.setState({ source: source.kind, status: "loading", error: null });
       // Fresh filters and calibration per session; the camera also restores the saved depth reference.
       processor.reset();
@@ -155,7 +158,7 @@ export function HandTrackingProvider({
         handStore.setState({ status: denied ? "denied" : "error", error: (e as Error).message, source: null });
       }
     },
-    [onFrame, processor, stop],
+    [onFrame, processor, stop, clock],
   );
 
   const api = useMemo<TrackingApi>(
