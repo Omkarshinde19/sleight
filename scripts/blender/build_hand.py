@@ -186,6 +186,8 @@ class Builder:
 
     def to_mesh(self, name):
         me = bpy.data.meshes.new(name)
+        # every part is a closed shell: point all faces outward so backface culling is safe
+        bmesh.ops.recalc_face_normals(self.bm, faces=self.bm.faces)
         self.bm.to_mesh(me)
         self.bm.free()
         return me
@@ -360,17 +362,31 @@ def build_forearm(b):
 
 # ---------- materials ----------
 
-def make_material(name, color, roughness, coat=0.5, film=0.0):
+def gltf_output_group():
+    """The exporter's "glTF Material Output" node group: where glTF-only values like iridescence live."""
+    from io_scene_gltf2.blender.com.material_helpers import create_settings_group, get_gltf_node_name
+
+    name = get_gltf_node_name()
+    return bpy.data.node_groups.get(name) or create_settings_group(name)
+
+
+def make_material(name, color, roughness, iridescence, coat=0.5):
+    """Chrome-like metal. Thin film exports as KHR_materials_iridescence; with no thickness texture only
+    the maximum (620 nm, as ChromeHand) is used."""
     mat = bpy.data.materials.new(name)
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    mat.use_backface_culling = True  # every part is a closed shell
+    nodes = mat.node_tree.nodes
+    bsdf = nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (*color, 1.0)
     bsdf.inputs["Metallic"].default_value = 1.0
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Coat Weight"].default_value = coat
     bsdf.inputs["Coat Roughness"].default_value = 0.06
-    # thin film exports as KHR_materials_iridescence
-    bsdf.inputs["Thin Film Thickness"].default_value = film
+    bsdf.inputs["Thin Film Thickness"].default_value = 620
     bsdf.inputs["Thin Film IOR"].default_value = 1.7
+    group = nodes.new("ShaderNodeGroup")
+    group.node_tree = gltf_output_group()
+    group.inputs["Iridescence Factor"].default_value = iridescence
     return mat
 
 
@@ -424,10 +440,10 @@ def main():
     build_forearm(b)
     me = b.to_mesh("RobotHandMesh")
     mats = {
-        "Chrome": make_material("Chrome", srgb("#eef1f7"), 0.09, film=400),
-        "Gunmetal": make_material("Gunmetal", srgb("#6f7689"), 0.26, film=250),
-        "Copper": make_material("Copper", srgb("#d0835a"), 0.2, film=200),
-        "Muscle": make_material("Muscle", srgb("#cdd3e2"), 0.16, film=400),
+        "Chrome": make_material("Chrome", srgb("#eef1f7"), 0.09, 0.9),
+        "Gunmetal": make_material("Gunmetal", srgb("#6f7689"), 0.26, 0.4),
+        "Copper": make_material("Copper", srgb("#d0835a"), 0.2, 0.3),
+        "Muscle": make_material("Muscle", srgb("#cdd3e2"), 0.16, 0.9),
     }
     for name in MATERIALS:
         me.materials.append(mats[name])
