@@ -3,6 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { ForearmFollower, SCENE_ELBOW, type ElbowPlacement } from "@/lib/hand/forearm";
 import { BONES, FINGERS, LM, type Handedness, type Point } from "@/lib/hand/types";
 import { makeChromeMaterial } from "@/lib/materials/chrome";
 import { handPose, type HandPoseSample } from "@/state/handPose";
@@ -33,6 +34,20 @@ function boneRadius(a: number): number {
 }
 
 const FOREARM = { length: 0.27, radius: 0.024 };
+/** When the forearm reaches off-screen, it grows at most to this multiple of its length. */
+const MAX_REACH = 2.5;
+
+const vNdc = new THREE.Vector3();
+/** Shortest length (≥ base) at which the forearm's far end is out of the camera's view; capped. */
+function offscreenLength(wrist: THREE.Vector3, dir: THREE.Vector3, camera: THREE.Camera, base: number) {
+  const step = base * 0.1;
+  for (let len = base; len < base * MAX_REACH; len += step) {
+    vNdc.copy(wrist).addScaledVector(dir, len).project(camera);
+    // a little past the edge, so the forearm's widest part is gone too
+    if (Math.abs(vNdc.x) > 1.15 || Math.abs(vNdc.y) > 1.15 || vNdc.z > 1) return len;
+  }
+  return base * MAX_REACH;
+}
 const VEINS = 3;
 const VEIN_STEPS = 5;
 const PALM_HALF_THICKNESS = 0.017;
@@ -155,18 +170,22 @@ export function ChromeHand({
   hand,
   scale = 1.5,
   tint,
-  elbowDrop = 0.35,
   forearm = 1,
+  elbowAt = SCENE_ELBOW,
+  reachOffscreen = true,
 }: {
   hand: Handedness;
   scale?: number;
   tint?: string;
-  /** How much the forearm angles down toward an elbow below the hand (0 = straight back). */
-  elbowDrop?: number;
+  /** Where the elbow sits (the forearm hangs toward it). */
+  elbowAt?: ElbowPlacement;
+  /** Grow the forearm until its end is off-screen, so it never shows as a stump. */
+  reachOffscreen?: boolean;
   /** Forearm length multiplier (shorter on the landing page so it stays clear of the headline). */
   forearm?: number;
 }) {
   const group = useRef<THREE.Group>(null);
+  const follower = useMemo(() => new ForearmFollower(elbowAt), [elbowAt]);
 
   const { parts, root, palmGeo, ghost } = useMemo(() => {
     const chrome = makeChromeMaterial(tint);
@@ -224,11 +243,14 @@ export function ChromeHand({
     return { parts, root, palmGeo, ghost };
   }, [tint]);
 
-  useFrame(() => {
+  useFrame(({ camera }, delta) => {
     const h = handStore.getState().hands[hand];
     if (!group.current) return;
     group.current.visible = !!h;
-    if (!h) return;
+    if (!h) {
+      follower.reset();
+      return;
+    }
     // the interpolated pose (smooth at any frame rate, and exactly where the physics colliders are)
     const pose = handPose.sample(hand);
     const J = (pose ?? h).joints.map((p) => toV(p));
@@ -320,11 +342,11 @@ export function ChromeHand({
     orient(parts.tendons[9], lift(J[LM.THUMB_MCP], boneRadius(LM.THUMB_CMC) * s), lift(J[LM.THUMB_IP], boneRadius(LM.THUMB_MCP) * s), dorsal, 0.0028 * s, 0.0028 * s);
 
     // ---- forearm ----
-    const armDir = vA.subVectors(wrist, J[LM.MIDDLE_MCP]).normalize().clone();
-    // angle the forearm down a little, like an arm resting on an elbow
-    armDir.y -= elbowDrop;
-    armDir.normalize();
-    const elbow = wrist.clone().addScaledVector(armDir, FOREARM.length * s * forearm);
+    // toward an elbow below the hand that follows it (see ForearmFollower), not straight back from the
+    // knuckles: that swung the whole arm with every wobble of the wrist
+    const armDir = toV(follower.update(wrist, J[LM.MIDDLE_MCP], delta, s));
+    const base = FOREARM.length * s * forearm;
+    const elbow = wrist.clone().addScaledVector(armDir, reachOffscreen ? offscreenLength(wrist, armDir, camera, base) : base);
     const fr = FOREARM.radius * s;
     orient(parts.forearm, wrist, elbow, dorsal, fr, fr * 0.86);
     const side = new THREE.Vector3().crossVectors(armDir, dorsal).normalize();
