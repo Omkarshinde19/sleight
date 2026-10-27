@@ -92,7 +92,7 @@ replay ─▶ PlaybackSource (recorded JSON)                                  �
                               · gestures with hysteresis + dwell · scene-space joints · motion history
                                                                          │  zustand store (read in useFrame)
                          ┌───────────────────────────────────────────────┼──────────────────────┐
-                    ChromeHand (render)          HandPhysics (Rapier): kinematic palm + fingertip
+                    RobotHand (render)           HandPhysics (Rapier): kinematic palm + fingertip
                                                  colliders · grab system (fixed / spring joints, or
                                                  velocity "drive" for tools) · throw velocity
 ```

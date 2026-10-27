@@ -1,9 +1,9 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Suspense, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { ChromeHand } from "@/components/hands/ChromeHand";
+import { RobotHand } from "@/components/hands/RobotHand";
 import { LANDING_ELBOW } from "@/lib/hand/forearm";
 import { Studio } from "@/components/scene/Studio";
 import { Weather } from "@/components/weather/Weather";
@@ -200,8 +200,10 @@ export default function LandingStage() {
     <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.2, 1.55], fov: 42, near: 0.05, far: 30 }} onCreated={({ camera }) => camera.lookAt(0, 1.13, 0)} gl={{ antialias: true }}>
       <Studio intensity={1.1} />
       <Weather />
-      <ChromeHand hand="Right" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
-      <ChromeHand hand="Left" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
+      <Suspense fallback={null}>
+        <RobotHand hand="Right" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
+        <RobotHand hand="Left" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
+      </Suspense>
       <Driver />
     </Canvas>
   );

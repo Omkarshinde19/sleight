@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { DEFAULT_WORKSPACE, type Workspace } from "@/lib/hand/mapping";
 import { useHandStore } from "@/state/handStore";
-import { ChromeHand } from "../hands/ChromeHand";
+import { RobotHand } from "../hands/RobotHand";
 import { DebugOverlay } from "../hud/DebugOverlay";
 import { SourceChooser } from "../hud/SourceChooser";
 import { SceneControls } from "../hud/SceneControls";
@@ -97,8 +97,10 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
             <ExposeThree />
           </Physics>
         </Suspense>
-        <ChromeHand hand="Right" scale={workspace.handScale} />
-        <ChromeHand hand="Left" scale={workspace.handScale} />
+        <Suspense fallback={null}>
+          <RobotHand hand="Right" scale={workspace.handScale} />
+          <RobotHand hand="Left" scale={workspace.handScale} />
+        </Suspense>
       </Canvas>
 
       <header className={styles.topBar}>
