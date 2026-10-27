@@ -1,0 +1,8 @@
+# Blender sources and source textures live in Git LFS (GitHub rejects files over 100 MB).
+# Scoped to assets/ so runtime files in public/ stay plain git and deploy without LFS.
+assets/**/*.blend filter=lfs diff=lfs merge=lfs -text
+assets/**/*.hdr filter=lfs diff=lfs merge=lfs -text
+assets/**/*.exr filter=lfs diff=lfs merge=lfs -text
+assets/textures/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/textures/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+assets/textures/**/*.tif filter=lfs diff=lfs merge=lfs -text

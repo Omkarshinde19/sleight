@@ -52,3 +52,7 @@ next-env.d.ts
 *.mov
 *.mjpeg
 *.y4m
+
+# Blender autosave/backup files
+*.blend1
+*.blend2
