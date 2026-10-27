@@ -1,0 +1,37 @@
+# Blender asset pipeline
+
+Blender makes the models; the site still renders with three.js. Source files live in `assets/blender/`
+(Git LFS), the exported, compressed models in `public/models/` (plain git, so Vercel needs no LFS).
+
+## Build the models
+
+```bash
+npm run assets            # every assets/blender/<name>.blend → public/models/<name>.glb
+npm run assets -- hand    # just one
+```
+
+Each file is exported headlessly by `scripts/blender/export.py` (+Y up, 1 Blender unit = 1 m, modifiers
+applied, skins and actions kept, cameras and lights left out, objects hidden from renders left out),
+then compressed by gltf-transform (meshopt geometry, WebP textures). Names of nodes, bones and materials
+are kept: code looks them up by name. `BLENDER=/path/to/blender` overrides the binary.
+
+Generated sources have a builder script beside the exporter, e.g.
+`blender -b --factory-startup --python scripts/blender/build_smoke.py` rebuilds `smoke.blend`.
+
+## Conventions
+
+- Scene units metric, unit scale 1.0 (the exporter refuses anything else).
+- Model in Blender's Z-up; the exporter converts. Blender (x, y, z) → three.js (x, z, −y).
+- `smoke.blend` / `smoke.glb` is the reference asset; `src/lib/assets/smoke.test.ts` and the Lab e2e
+  test check that names, scale and orientation survive the pipeline. Re-run both after changing export
+  or compression flags.
+
+## Blender MCP (driving the open Blender from Claude Code)
+
+- Blender: 3D view → N panel → "MCP for Blender" → Start MCP Server (listens on `127.0.0.1:9876`).
+- The `blender` MCP server is registered with **local scope for the `sleight/` folder**
+  (`claude mcp get blender`). Start Claude Code sessions in `sleight/`, not the parent folder, or its
+  tools won't load. To load it everywhere instead:
+  `claude mcp add -s user blender --env DISABLE_TELEMETRY=true -- uvx mcp-for-blender`.
+- Without the tools, the add-on socket still accepts JSON commands such as
+  `{"type": "get_scene_info", "params": {}}` and `{"type": "execute_code", "params": {"code": "…"}}`.
