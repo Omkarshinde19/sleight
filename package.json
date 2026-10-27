@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "predev": "node scripts/copy-mediapipe.mjs",
     "prebuild": "node scripts/copy-mediapipe.mjs",
-    "postinstall": "node scripts/copy-mediapipe.mjs"
+    "postinstall": "node scripts/copy-mediapipe.mjs",
+    "assets": "node scripts/assets.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.1",
@@ -26,6 +27,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19",
