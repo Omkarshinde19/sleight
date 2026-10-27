@@ -1,6 +1,14 @@
 import type { HandLandmarker } from "@mediapipe/tasks-vision";
-import type { Handedness, RawFrame, RawHand } from "../hand/types";
+import type { RawFrame } from "../hand/types";
+import { toRawHands } from "./landmarks";
 import type { TrackingSource } from "./source";
+import type { TrackerReply, TrackerRequest } from "./trackerProtocol";
+
+/** What requestVideoFrameCallback reports; captureTime is when the webcam took the frame. */
+interface FrameMeta {
+  captureTime?: number;
+  mediaTime?: number;
+}
 
 export class CameraError extends Error {
   constructor(
@@ -11,14 +19,23 @@ export class CameraError extends Error {
   }
 }
 
-/** Webcam + MediaPipe HandLandmarker, all in this tab. Frames are never uploaded anywhere. */
+/**
+ * Webcam + MediaPipe HandLandmarker, all in this tab. Frames are never uploaded anywhere.
+ * Detection runs in a worker (public/tracker-worker.js) so it never holds up drawing; if the worker can't
+ * start, it runs on the main thread as before. Frames are stamped with the camera's capture time.
+ */
 export class CameraSource implements TrackingSource {
   readonly kind = "camera";
   video?: HTMLVideoElement;
   delegate?: "GPU" | "CPU";
+  /** Whether detection runs in the worker (false = main-thread fallback). */
+  inWorker = false;
   private landmarker?: HandLandmarker;
+  private worker?: Worker;
   private stream?: MediaStream;
   private running = false;
+  /** stop() was called, possibly while start() was still loading. */
+  private stopped = false;
   private frameHandle = 0;
 
   constructor(private numHands: number) {}
@@ -27,18 +44,30 @@ export class CameraSource implements TrackingSource {
     // Ask for the camera and load the tracker in parallel. If either fails, release the other,
     // otherwise a half-started camera stays locked and the next attempt can't open it.
     const cam = this.openCamera();
-    const tracker = this.loadTracker(this.preferGpu ? "GPU" : "CPU");
+    const tracker = this.startWorker(this.preferGpu ? "GPU" : "CPU").catch((e: Error) => {
+      console.warn(`Hand tracker worker unavailable (${e.message}); tracking on the main thread.`);
+      return this.loadTracker(this.preferGpu ? "GPU" : "CPU");
+    });
     let stream: MediaStream;
-    let landmarker: HandLandmarker;
+    let backend: Worker | HandLandmarker;
     try {
-      [stream, landmarker] = await Promise.all([cam, tracker]);
+      [stream, backend] = await Promise.all([cam, tracker]);
     } catch (e) {
       cam.then((s) => s.getTracks().forEach((t) => t.stop())).catch(() => {});
-      tracker.then((l) => l.close()).catch(() => {});
+      tracker.then((b) => (b instanceof Worker ? b.terminate() : b.close())).catch(() => {});
       throw e;
     }
+    if (this.stopped) {
+      stream.getTracks().forEach((t) => t.stop());
+      if (backend instanceof Worker) backend.terminate();
+      else backend.close();
+      return;
+    }
     this.stream = stream;
-    this.landmarker = landmarker;
+    if (backend instanceof Worker) {
+      this.worker = backend;
+      this.inWorker = true;
+    } else this.landmarker = backend;
     // Free the camera the moment this page goes away, so a refresh can reopen it straight away.
     window.addEventListener("pagehide", this.onPageHide);
 
@@ -60,31 +89,45 @@ export class CameraSource implements TrackingSource {
 
     let lastVideoTime = -1;
     let failures = 0;
-    const tick = () => {
+    let busy = false;
+    const aspect = () => video.videoWidth / video.videoHeight || 4 / 3;
+    if (this.worker)
+      this.worker.onmessage = (e: MessageEvent<TrackerReply>) => {
+        const m = e.data;
+        if (m.type === "result") {
+          busy = false;
+          if (this.running) emit({ t: m.t, hands: toRawHands(m.result), aspect: m.width / m.height || aspect(), latencyMs: m.detectMs });
+        } else if (m.type === "ready") this.delegate = m.delegate;
+        else if (m.fatal) this.onError?.(`The hand tracker stopped: ${m.message}`);
+      };
+
+    const tick = (now: number, meta?: FrameMeta) => {
       if (!this.running) return;
-      if (video.readyState >= 2 && video.videoWidth > 0 && video.currentTime !== lastVideoTime) {
-        lastVideoTime = video.currentTime;
-        const t0 = performance.now();
-        try {
-          const result = this.landmarker!.detectForVideo(video, t0);
-          failures = 0;
-          const hands: RawHand[] = result.landmarks.map((landmarks, i) => ({
-            // Checked against a recorded (unmirrored) webcam clip: tasks-vision 1.x labels the user's
-            // actual hand for unmirrored frames, despite older docs describing a selfie-mirror convention.
-            handedness: (result.handedness[i]?.[0]?.categoryName === "Right" ? "Right" : "Left") as Handedness,
-            score: result.handedness[i]?.[0]?.score ?? 0,
-            landmarks: landmarks.map(({ x, y, z }) => ({ x, y, z })),
-            worldLandmarks: (result.worldLandmarks[i] ?? []).map(({ x, y, z }) => ({ x, y, z })),
-          }));
-          emit({
-            t: t0,
-            hands: dedupeHandedness(hands),
-            aspect: video.videoWidth / video.videoHeight || 4 / 3,
-            latencyMs: performance.now() - t0,
-          });
-        } catch (e) {
-          // A GPU context that dies after a reload throws on every frame: fall back to the CPU once.
-          if (++failures === 5) void this.fallBackToCpu(e as Error);
+      const mediaTime = meta?.mediaTime ?? video.currentTime;
+      if (video.readyState >= 2 && video.videoWidth > 0 && mediaTime !== lastVideoTime) {
+        lastVideoTime = mediaTime;
+        // when the webcam took the frame (same clock as performance.now); else when it reached us
+        const t = meta?.captureTime ?? now;
+        const worker = this.worker;
+        if (worker) {
+          // One frame in flight at a time: a late frame is skipped, never queued (queues add lag).
+          if (!busy) {
+            busy = true;
+            createImageBitmap(video).then(
+              (bitmap) => worker.postMessage({ type: "frame", bitmap, t } satisfies TrackerRequest, [bitmap]),
+              () => (busy = false),
+            );
+          }
+        } else {
+          try {
+            const t0 = performance.now();
+            const hands = toRawHands(this.landmarker!.detectForVideo(video, t));
+            failures = 0;
+            emit({ t, hands, aspect: aspect(), latencyMs: performance.now() - t0 });
+          } catch (e) {
+            // A GPU context that dies after a reload throws on every frame: fall back to the CPU once.
+            if (++failures === 5) void this.fallBackToCpu(e as Error);
+          }
         }
       }
       this.schedule(tick);
@@ -113,8 +156,8 @@ export class CameraSource implements TrackingSource {
     }
   }
 
-  private schedule(fn: () => void) {
-    const v = this.video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+  private schedule(fn: (now: number, meta?: FrameMeta) => void) {
+    const v = this.video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: (now: number, meta: FrameMeta) => void) => number };
     if (v?.requestVideoFrameCallback) this.frameHandle = v.requestVideoFrameCallback(fn);
     else this.frameHandle = requestAnimationFrame(fn);
   }
@@ -145,6 +188,28 @@ export class CameraSource implements TrackingSource {
         throw new CameraError("No usable camera was found.", "unavailable");
       }
     }
+  }
+
+  /** Start the tracker worker; rejects if it can't load (then the main thread runs MediaPipe). */
+  private startWorker(prefer: "GPU" | "CPU") {
+    if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined")
+      return Promise.reject(new Error("no worker support"));
+    return new Promise<Worker>((resolve, reject) => {
+      const worker = new Worker("/tracker-worker.js", { type: "module" });
+      const fail = (message: string) => {
+        worker.terminate();
+        reject(new Error(message));
+      };
+      worker.onerror = (e) => fail(e.message || "worker failed to start");
+      worker.onmessage = (e: MessageEvent<TrackerReply>) => {
+        if (e.data.type === "ready") {
+          this.delegate = e.data.delegate;
+          worker.onerror = null;
+          resolve(worker);
+        } else if (e.data.type === "error") fail(e.data.message);
+      };
+      worker.postMessage({ type: "init", numHands: this.numHands, prefer } satisfies TrackerRequest);
+    });
   }
 
   private async loadTracker(prefer: "GPU" | "CPU") {
@@ -178,6 +243,7 @@ export class CameraSource implements TrackingSource {
   }
 
   stop() {
+    this.stopped = true;
     this.running = false;
     window.removeEventListener("pagehide", this.onPageHide);
     const v = this.video as (HTMLVideoElement & { cancelVideoFrameCallback?: (h: number) => void }) | undefined;
@@ -186,19 +252,9 @@ export class CameraSource implements TrackingSource {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.landmarker?.close();
     this.landmarker = undefined;
+    this.worker?.terminate();
+    this.worker = undefined;
+    this.inWorker = false;
     this.video = undefined;
   }
-}
-
-/** Two detections can occasionally get the same label; keep the more confident one. */
-function dedupeHandedness(hands: RawHand[]): RawHand[] {
-  if (hands.length < 2 || hands[0].handedness !== hands[1].handedness) return hands;
-  const [a, b] = hands;
-  // Same label: the unmirrored frame shows the user's right hand on the image's left.
-  const ax = a.landmarks[0].x;
-  const bx = b.landmarks[0].x;
-  return [
-    { ...a, handedness: ax < bx ? "Right" : "Left" },
-    { ...b, handedness: ax < bx ? "Left" : "Right" },
-  ];
 }
