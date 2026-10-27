@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { Bone, Mesh, SkinnedMesh, Vector3 } from "three";
+import { Bone, Mesh, MeshPhysicalMaterial, SkinnedMesh, Vector3 } from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { describe, expect, it } from "vitest";
@@ -62,5 +62,9 @@ describe("robot hand model", () => {
     const names = new Set(meshes.flatMap((m) => (Array.isArray(m.material) ? m.material : [m.material]).map((x) => x.name)));
     expect([...names].sort()).toEqual(["Chrome", "Copper", "Gunmetal", "Muscle"]);
     expect((meshes[0] as SkinnedMesh).skeleton.bones).toHaveLength(22);
+    const chrome = meshes.flatMap((m) => m.material).find((x) => x.name === "Chrome") as MeshPhysicalMaterial;
+    expect(chrome.metalness).toBe(1);
+    expect(chrome.iridescence).toBeCloseTo(0.9, 3);
+    expect(chrome.clearcoat).toBeCloseTo(0.5, 3);
   });
 });
