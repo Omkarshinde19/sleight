@@ -50,5 +50,13 @@ Built by `scripts/blender/build_hand.py`; pinned by `src/lib/assets/robotHand.te
 - Real-hand size (metres); the scene's `handScale` scales it up.
 - One skinned mesh, every rigid part weighted 100 % to one bone; materials `Chrome`, `Gunmetal`,
   `Copper`, `Muscle` (thin film → `KHR_materials_iridescence`, coat → `KHR_materials_clearcoat`).
-- Only a right hand is modelled. The left hand is not done yet: either a mirrored copy in Blender or the
-  right hand mirrored in code. That choice belongs with the hand-driving work (Step 1.2).
+- Only a right hand is modelled; a left hand is solved as a mirrored right hand and drawn mirrored.
+
+## Driving it (`src/lib/hand/rig.ts`, `src/components/hands/RobotHand.tsx`)
+
+Each frame `HandRig` takes the same settled joints the physics colliders use. The palm frame (+Y to the
+middle knuckle, +X toward the pinky, +Z back of the hand) orients the wrist; every other bone starts
+from its parent's orientation and swings, by the smallest rotation, to point at its child joint, so no
+bone twists on its own. Each bone stretches to the tracked bone length; thickness follows the hand
+scale. Bones are flattened under one root so stretching never shears children. The forearm is aimed
+by `ForearmFollower` and grows until it leaves the screen.
