@@ -124,7 +124,9 @@ export class CameraSource implements TrackingSource {
       throw new CameraError("This browser has no camera access (it needs HTTPS or localhost).", "unavailable");
     const constraints: MediaStreamConstraints = {
       audio: false,
-      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+      // 60 fps where the webcam can do it: twice the samples lets the filters smooth less for the same
+      // steadiness. Cameras that can't just give their best (usually 30).
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 60 } },
     };
     // Right after a refresh the old page may still hold the camera for a moment ("could not start
     // video source"). That's worth a few quick retries; a denied permission is not.
