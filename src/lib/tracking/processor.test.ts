@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FeelMeter } from "../hand/feel";
 import type { Handedness, RawFrame } from "../hand/types";
-import { COAST_MS, HandProcessor } from "./processor";
+import { applySmoothingPreset, COAST_MS, HandProcessor, SMOOTHING } from "./processor";
 import demo from "../../../public/sessions/demo.json";
 import arcade from "../hand/__fixtures__/arcade-session.json";
 
@@ -113,5 +113,18 @@ describe("HandProcessor on a real arcade session (two hands, grabs and throws)",
     const both = frames.filter((f) => f.Left && f.Right && !f.Left.lost && !f.Right.lost);
     const wrongSide = both.filter((f) => f.Right!.palm.x < f.Left!.palm.x).length;
     expect(wrongSide / both.length).toBeLessThan(0.01);
+  });
+});
+
+describe("smoothing presets", () => {
+  it("switches settings by name, ignores unknown names, and goes back to today's", () => {
+    const today = structuredClone(SMOOTHING);
+    expect(applySmoothingPreset("nope")).toBe(false);
+    expect(SMOOTHING).toEqual(today);
+    expect(applySmoothingPreset("F")).toBe(true);
+    expect(SMOOTHING.anchor.beta).toBe(25);
+    expect(SMOOTHING.image).toEqual(today.image);
+    expect(applySmoothingPreset("today")).toBe(true);
+    expect(SMOOTHING).toEqual(today);
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { BONES, type Handedness } from "@/lib/hand/types";
+import { activeSmoothing } from "@/lib/tracking/processor";
 import { feel } from "@/state/feel";
 import { handStore, useHandStore } from "@/state/handStore";
 import { useTracking } from "../tracking/HandTrackingProvider";
@@ -86,7 +87,7 @@ export function DebugOverlay() {
           `dropouts ${f.dropoutsPerMin.toFixed(1)}/min (bridged ${f.bridgedPerMin.toFixed(1)}, longest ${f.longestGapMs.toFixed(0)} ms) · held through ${f.coastSaves} · dropped ${f.lossDrops}`,
         ];
         stats.current.innerHTML = [
-          `render ${renderFps.toFixed(0)} fps · tracker ${s.trackerFps.toFixed(0)} fps · ${s.source === "camera" ? `${s.latencyMs.toFixed(1)} ms ${s.delegate ?? ""}` : (s.source ?? "no source")}`,
+          `render ${renderFps.toFixed(0)} fps · tracker ${s.trackerFps.toFixed(0)} fps · smooth ${activeSmoothing} · ${s.source === "camera" ? `${s.latencyMs.toFixed(1)} ms ${s.delegate ?? ""}` : (s.source ?? "no source")}`,
           ...rows,
           ...feelRows,
           s.calibrating ? `<span class="${styles.warn}">calibrating depth — hold still</span>` : "",

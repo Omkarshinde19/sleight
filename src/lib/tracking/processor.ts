@@ -68,12 +68,45 @@ export const COAST_MS = 250;
 const COAST_TAU = 0.06;
 const COAST_MAX_DRIFT = 0.05;
 
+/**
+ * One Euro settings (minCutoff Hz, beta per unit/s of speed). `world` shapes the hand (metres,
+ * wrist-relative), `anchor` places it (scene metres; z is depth, which is noisier), `image` is only the
+ * debug overlay (normalised image units).
+ */
+export const SMOOTHING = {
+  image: { minCutoff: 1.5, beta: 0.03 },
+  world: { minCutoff: 1.0, beta: 0.04 },
+  anchor: { minCutoff: 1.0, beta: 0.6 },
+  anchorZ: { minCutoff: 0.4, beta: 0.15 },
+};
+
+/**
+ * Candidate settings to compare by feel (dev only, `?smooth=<name>`). Lag / shake measured on the
+ * recorded arcade session: today 110 ms / 5.2 mm, A 40 ms / 10.4 mm, F 25 ms / 12.2 mm.
+ */
+export const SMOOTHING_PRESETS: Record<string, Partial<typeof SMOOTHING>> = {
+  today: {},
+  A: { world: { minCutoff: 2.5, beta: 20 }, anchor: { minCutoff: 2.0, beta: 8 }, anchorZ: { minCutoff: 0.8, beta: 1.5 } },
+  F: { world: { minCutoff: 1.5, beta: 40 }, anchor: { minCutoff: 1.0, beta: 25 }, anchorZ: { minCutoff: 0.6, beta: 3 } },
+};
+
+const DEFAULT_SMOOTHING = structuredClone(SMOOTHING);
+/** Name of the preset in use, for the debug overlay. */
+export let activeSmoothing = "today";
+
+/** Switch to a named preset for processors created after this call. Unknown names are ignored. */
+export function applySmoothingPreset(name: string | null): boolean {
+  const preset = name ? SMOOTHING_PRESETS[name] : undefined;
+  if (!name || !preset) return false;
+  Object.assign(SMOOTHING, structuredClone(DEFAULT_SMOOTHING), structuredClone(preset));
+  activeSmoothing = name;
+  return true;
+}
+
 const newChannel = (): HandChannel => ({
-  // Image landmarks: light smoothing for the overlay. World: a bit more, since it drives the robot.
-  image: new PointsFilter(21, 1.5, 0.03),
-  world: new PointsFilter(21, 1.0, 0.04),
-  // The anchor drives position: depth (z) is noisy, so it gets a much lower cutoff.
-  anchor: new PointsFilter(1, 1.0, 0.6, { minCutoff: 0.4, beta: 0.15 }),
+  image: new PointsFilter(21, SMOOTHING.image.minCutoff, SMOOTHING.image.beta),
+  world: new PointsFilter(21, SMOOTHING.world.minCutoff, SMOOTHING.world.beta),
+  anchor: new PointsFilter(1, SMOOTHING.anchor.minCutoff, SMOOTHING.anchor.beta, SMOOTHING.anchorZ),
   classifier: new GestureClassifier(3),
   depth: new DepthEstimator(),
   calibrating: true,
