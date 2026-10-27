@@ -1,5 +1,7 @@
 # Hand-off: Blender + UI work (v3)
 
+> **Superseded (2026-10-28):** this work is done. Start from `docs/HANDOFF-theatre.md`.
+
 Read this first in a fresh session. It is self-contained — it assumes no prior conversation.
 
 ## What this project is

@@ -1,5 +1,9 @@
 # Sleight v3: Blender assets and the "Sound Waves" UI
 
+> **Progress (2026-10-28):** Step 0 and Steps 1.1–1.3 are done and live, plus the arcade feel fixes
+> (smoothing, tracker worker, capture-time stamps, following forearm, skeleton flip fix). Next: the
+> surgery room. Hand-off: `docs/HANDOFF-theatre.md`.
+
 **Status (2026-10-28):** Step 0 setup is done — Blender 5.2.3 LTS installed, `uv` installed, the
 "MCP for Blender" add-on (v1.8) enabled, its server listening on `127.0.0.1:9876`, and the `blender`
 MCP server registered in Claude Code (`claude mcp list` → ✔ Connected). Nothing is committed yet from
