@@ -32,6 +32,8 @@ export interface MotionKey {
 const ASPECT = 4 / 3;
 const NEAR = 0.3;
 const FAR = 0.85;
+/** reach() glides the hand there with this time constant (s): a careful reach, not a teleport. */
+const REACH_TAU = 0.18;
 
 /**
  * Keyboard + mouse virtual hands. They are synthesised as real landmarks and fed through the same
@@ -50,6 +52,8 @@ export class SimulatedSource implements TrackingSource {
   private held = new Set<string>();
   private cleanup: (() => void)[] = [];
   private scripts: { hand: Handedness; keys: MotionKey[]; t0: number; from: SimHandState }[] = [];
+  /** Where reach() is taking each hand. Direct moves (mouse, set, scripts) cancel it. */
+  private goals: Partial<Record<Handedness, Pick<SimHandState, "imageX" | "imageY" | "distance">>> = {};
 
   constructor(
     private surface: HTMLElement,
@@ -112,6 +116,7 @@ export class SimulatedSource implements TrackingSource {
 
   /** Set a hand directly (used by tests and the demo autopilot). */
   set(hand: Handedness, patch: Partial<Omit<SimHandState, "handedness" | "pose">>) {
+    if ("imageX" in patch || "imageY" in patch || "distance" in patch) delete this.goals[hand];
     Object.assign(this.hands[hand], patch);
   }
 
@@ -120,16 +125,18 @@ export class SimulatedSource implements TrackingSource {
    * was calibrated at the starting distance (0.5 m). Used by tests and the demo autopilot.
    */
   reach(hand: Handedness, p: Point, ws: Workspace, calibratedDistance = 0.5) {
-    const h = this.hands[hand];
-    h.visible = true;
-    h.imageX = clamp(0.5 - (p.x - ws.center.x) / ws.width, 0.02, 0.98);
-    h.imageY = clamp(0.5 - (p.y - ws.center.y) / ws.height, 0.02, 0.98);
-    h.distance = clamp(calibratedDistance * (1 + (p.z - ws.center.z) / ws.depthGain), NEAR, FAR);
+    this.hands[hand].visible = true;
+    this.goals[hand] = {
+      imageX: clamp(0.5 - (p.x - ws.center.x) / ws.width, 0.02, 0.98),
+      imageY: clamp(0.5 - (p.y - ws.center.y) / ws.height, 0.02, 0.98),
+      distance: clamp(calibratedDistance * (1 + (p.z - ws.center.z) / ws.depthGain), NEAR, FAR),
+    };
   }
 
   /** Play a scripted motion, e.g. a throw. */
   play(hand: Handedness, keys: MotionKey[]) {
     this.scripts = this.scripts.filter((s) => s.hand !== hand);
+    delete this.goals[hand];
     this.scripts.push({ hand, keys, t0: performance.now(), from: { ...this.hands[hand] } });
   }
 
@@ -163,8 +170,20 @@ export class SimulatedSource implements TrackingSource {
     }
     this.scripts = this.scripts.filter((s) => (now - s.t0) / 1000 <= s.keys[s.keys.length - 1].at);
 
-    // Fingers move toward the target pose with a ~60 ms time constant.
-    const blend = 1 - Math.exp(-dt / 0.06);
+    const glide = 1 - Math.exp(-dt / REACH_TAU);
+    for (const [hand, goal] of Object.entries(this.goals) as [Handedness, NonNullable<(typeof this.goals)[Handedness]>][]) {
+      const h = this.hands[hand];
+      h.imageX += (goal.imageX - h.imageX) * glide;
+      h.imageY += (goal.imageY - h.imageY) * glide;
+      h.distance += (goal.distance - h.distance) * glide;
+      if (Math.abs(goal.imageX - h.imageX) + Math.abs(goal.imageY - h.imageY) + Math.abs(goal.distance - h.distance) < 1e-4) {
+        Object.assign(h, goal);
+        delete this.goals[hand];
+      }
+    }
+
+    // Fingers move toward the target pose with a ~120 ms time constant (a real hand closes in ~0.3 s).
+    const blend = 1 - Math.exp(-dt / 0.12);
     for (const h of Object.values(this.hands)) h.pose = lerpPose(h.pose, SIM_POSES[h.target], blend);
 
     // Held keys
@@ -193,6 +212,7 @@ export class SimulatedSource implements TrackingSource {
     on(el, "pointermove", (e) => {
       const r = el.getBoundingClientRect();
       const h = this.hands[this.active];
+      delete this.goals[this.active];
       // The screen is a mirror: pointer on the right = the user's right = the image's left.
       h.imageX = clamp(1 - (e.clientX - r.left) / r.width, 0.05, 0.95);
       h.imageY = clamp((e.clientY - r.top) / r.height, 0.05, 0.95);
