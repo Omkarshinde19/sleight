@@ -35,3 +35,20 @@ Generated sources have a builder script beside the exporter, e.g.
   `claude mcp add -s user blender --env DISABLE_TELEMETRY=true -- uvx mcp-for-blender`.
 - Without the tools, the add-on socket still accepts JSON commands such as
   `{"type": "get_scene_info", "params": {}}` and `{"type": "execute_code", "params": {"code": "…"}}`.
+
+## Robot hand contract (`robot-hand.glb`)
+
+Built by `scripts/blender/build_hand.py`; pinned by `src/lib/assets/robotHand.test.ts`.
+
+- Armature `RobotHand`: 21 bones named after MediaPipe's landmarks (`WRIST`, `THUMB_CMC` …
+  `INDEX_FINGER_MCP` … `PINKY_TIP`) plus `FOREARM` (elbow → wrist, parent of `WRIST`). Finger roots
+  are children of `WRIST`. Bone *X* starts at landmark *X* and points at the next landmark; `*_TIP`
+  bones are 12 mm nubs.
+- Rest pose (three.js axes): open right hand, wrist at the origin, fingers +Y, back of the hand +Z,
+  palm −Z, thumb on −X. That's the frame the tracker puts a right hand in, palm to the webcam.
+- Bone axes: local +Y along the bone, local +Z toward the back of the hand (thumbnail for the thumb).
+- Real-hand size (metres); the scene's `handScale` scales it up.
+- One skinned mesh, every rigid part weighted 100 % to one bone; materials `Chrome`, `Gunmetal`,
+  `Copper`, `Muscle` (thin film → `KHR_materials_iridescence`, coat → `KHR_materials_clearcoat`).
+- Only a right hand is modelled. The left hand is not done yet: either a mirrored copy in Blender or the
+  right hand mirrored in code. That choice belongs with the hand-driving work (Step 1.2).
