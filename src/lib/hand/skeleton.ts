@@ -99,8 +99,10 @@ export class Skeleton {
     });
 
     this.flexEma += 0.05 * (pipSum / 4 - this.flexEma);
-    if (!this.flipped && this.flexEma < -0.3) this.flip();
-    else if (this.flipped && this.flexEma > 0.3) this.flip();
+    // flexEma is measured with the sign in use, flipped or not: clearly negative means that sign is
+    // wrong. (It used to flip back only when the reading was positive, i.e. when the sign was right,
+    // so a hand flipped early by a relabel stayed wrong and every fist curled outwards.)
+    if (this.flexEma < -0.3) this.flip();
     return out;
   }
 
