@@ -71,37 +71,16 @@ const COAST_MAX_DRIFT = 0.05;
 /**
  * One Euro settings (minCutoff Hz, beta per unit/s of speed). `world` shapes the hand (metres,
  * wrist-relative), `anchor` places it (scene metres; z is depth, which is noisier), `image` is only the
- * debug overlay (normalised image units).
+ * debug overlay (normalised image units). Picked by feel in arcade from three candidates: on the recorded
+ * arcade session the palm trails the tracker by ~25 ms (was 110 ms) at about 2.3x the frame-to-frame
+ * shake. The betas are large because speeds here are in metres per second, not pixels.
  */
-export const SMOOTHING = {
+const SMOOTHING = {
   image: { minCutoff: 1.5, beta: 0.03 },
-  world: { minCutoff: 1.0, beta: 0.04 },
-  anchor: { minCutoff: 1.0, beta: 0.6 },
-  anchorZ: { minCutoff: 0.4, beta: 0.15 },
+  world: { minCutoff: 1.5, beta: 40 },
+  anchor: { minCutoff: 1.0, beta: 25 },
+  anchorZ: { minCutoff: 0.6, beta: 3 },
 };
-
-/**
- * Candidate settings to compare by feel (dev only, `?smooth=<name>`). Lag / shake measured on the
- * recorded arcade session: today 110 ms / 5.2 mm, A 40 ms / 10.4 mm, F 25 ms / 12.2 mm.
- */
-export const SMOOTHING_PRESETS: Record<string, Partial<typeof SMOOTHING>> = {
-  today: {},
-  A: { world: { minCutoff: 2.5, beta: 20 }, anchor: { minCutoff: 2.0, beta: 8 }, anchorZ: { minCutoff: 0.8, beta: 1.5 } },
-  F: { world: { minCutoff: 1.5, beta: 40 }, anchor: { minCutoff: 1.0, beta: 25 }, anchorZ: { minCutoff: 0.6, beta: 3 } },
-};
-
-const DEFAULT_SMOOTHING = structuredClone(SMOOTHING);
-/** Name of the preset in use, for the debug overlay. */
-export let activeSmoothing = "today";
-
-/** Switch to a named preset for processors created after this call. Unknown names are ignored. */
-export function applySmoothingPreset(name: string | null): boolean {
-  const preset = name ? SMOOTHING_PRESETS[name] : undefined;
-  if (!name || !preset) return false;
-  Object.assign(SMOOTHING, structuredClone(DEFAULT_SMOOTHING), structuredClone(preset));
-  activeSmoothing = name;
-  return true;
-}
 
 const newChannel = (): HandChannel => ({
   image: new PointsFilter(21, SMOOTHING.image.minCutoff, SMOOTHING.image.beta),

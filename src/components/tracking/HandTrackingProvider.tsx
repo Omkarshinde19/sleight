@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Workspace } from "@/lib/hand/mapping";
 import { CameraError, CameraSource } from "@/lib/tracking/camera";
 import { downloadRecording, PlaybackSource, Recorder } from "@/lib/tracking/playback";
-import { applySmoothingPreset, HandProcessor } from "@/lib/tracking/processor";
+import { HandProcessor } from "@/lib/tracking/processor";
 import { SimulatedSource } from "@/lib/tracking/simulated";
 import type { Recording, TrackingSource } from "@/lib/tracking/source";
 import type { RawFrame } from "@/lib/hand/types";
@@ -88,12 +88,7 @@ export function HandTrackingProvider({
   surface: React.RefObject<HTMLElement | null>;
 }) {
   const sourceRef = useRef<TrackingSource | null>(null);
-  const processor = useMemo(() => {
-    // dev only: ?smooth=<preset> to compare smoothing settings by feel
-    if (process.env.NODE_ENV !== "production" && typeof window !== "undefined")
-      applySmoothingPreset(new URLSearchParams(window.location.search).get("smooth"));
-    return new HandProcessor(workspace, feel, onLabelSwap);
-  }, [workspace]);
+  const processor = useMemo(() => new HandProcessor(workspace, feel, onLabelSwap), [workspace]);
   const recorder = useMemo(() => new Recorder(), []);
   const lastFrameT = useRef(0);
   const [sim, setSim] = useState<SimulatedSource | null>(null);
