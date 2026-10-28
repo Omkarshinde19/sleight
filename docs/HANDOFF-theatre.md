@@ -63,10 +63,16 @@ v3 plan: `docs/PLAN-v3.md`. Blender pipeline and hand contract: `docs/BLENDER.md
   - Skeleton flip fix (`src/lib/hand/skeleton.ts`): fists no longer curl outwards after an early relabel.
   - The simulated hand (tests, demo autopilot) glides to `reach()` targets (0.18 s) and curls at 0.12 s.
 
+**Landing page (2026-10-28):** rebuilt as a poster in jet / hot pink / chartreuse, scoped to the
+landing page (the scenes are unchanged). `Landing.tsx` (layout), `LandingStage.tsx` (one hand, driven by
+the mouse, room previews, or the tracker when the camera pill is on), `Halftone.tsx` (dot-screen pass),
+`Blobs.tsx` (metaballs), `letters.ts` (grabbable headline), `hero.ts` (shared per-frame state). Tests:
+`e2e/landing.spec.ts`, `e2e/landing-camera.spec.ts`.
+
 **Still open (not started unless the user asks):** Step 1.4 Poly Haven HDRI (needs download permission),
 1.5 Blender props, 1.6 landing animations, 1.7 perf budget in e2e, authored ball grip for arcade (the
-user picked it; not built yet), and all of
-Step 2 (UI palette: **confirm colours with the user before writing any tokens**).
+user picked it; not built yet), and the rest of
+Step 2 (restyling the scenes' HUDs: the user said the rooms stay as they are).
 
 ## The surgery room today (`src/scenes/theatre/`)
 

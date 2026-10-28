@@ -64,7 +64,11 @@ The tracking, physics and grab system stay as they are. Only what you *see* chan
 
 ## Step 2: Convert the UI to the new palette and style
 
-⛔ **Colours and style are a draft — confirm with the user before writing any tokens or recolouring.**
+✅ **Landing page done (2026-10-28).** The user confirmed jet #0B0B0B / hot pink #FF2DA8 / chartreuse
+#D4FF3F for the **landing page only**: the arcade and theatre keep their look (2.6, 2.7 are not to be done
+unless asked). Tokens live in `src/components/landing/landing.module.css`, not `globals.css`. Display face:
+Archivo at wdth 125 / weight 900 (`src/components/landing/fonts.ts`). The hand on the page: halftone
+print, blobs it stirs and squeezes, mouse control, grabbable letters, room previews on hover, camera pill.
 
 Reference: the "SOUND WAVES" poster. Bold, very wide grotesk type in hot pink, chartreuse liquid
 blobs, halftone dots, a black-and-white photo, small wide-tracked uppercase labels, numbered
