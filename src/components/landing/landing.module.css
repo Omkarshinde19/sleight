@@ -1,4 +1,13 @@
+/* Poster palette, scoped to the landing page: the scenes keep the shared tokens in globals.css. */
 .page {
+  --jet: #0b0b0b;
+  --jet-2: #161616;
+  --pink: #ff2da8;
+  --lime: #d4ff3f;
+  --paper: #f2f2f2;
+  --paper-dim: rgba(242, 242, 242, 0.62);
+  --paper-faint: rgba(242, 242, 242, 0.22);
+  --font-wide: var(--font-poster), "Arial Black", sans-serif;
   position: relative;
   min-height: 100vh;
 }

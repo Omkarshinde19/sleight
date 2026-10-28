@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { callouts } from "./callouts";
+import { archivo } from "./fonts";
 import { updateScroll } from "./scroll";
 import styles from "./landing.module.css";
 
@@ -73,7 +74,7 @@ export function Landing() {
   }, []);
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${archivo.variable}`}>
       <div className={styles.backdrop} aria-hidden />
       <div className={styles.stage} aria-hidden>
         {showStage && <LandingStage />}
