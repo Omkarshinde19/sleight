@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/Omkarshinde19/sleight/actions/workflows/ci.yml/badge.svg)](https://github.com/Omkarshinde19/sleight/actions/workflows/ci.yml)
 
-A browser robotics sandbox. Your hand, tracked by your webcam, drives chrome robot hands through three
-physics scenes: an arcade, a factory floor and an operating theatre.
+A browser robotics sandbox. Your hand, tracked by your webcam, drives chrome robot hands through two
+physics scenes: an arcade and an operating theatre.
 
 **100% client-side.** The hand tracker (MediaPipe) runs as WASM in your tab, and its model and runtime are
 served from this site rather than a CDN. Webcam frames are never uploaded: there is no server to send them to.
@@ -21,10 +21,6 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
   the rack can't knock balls off, and dropped or missed balls go back to their cradles. It scores
   only when it drops down through the rim. You get streaks, a hoop that starts to drift from a streak of 3,
   dashed trajectory arcs and an aim assist (off / fair / strong).
-- **Industrial Floor** (`/industrial`). A precise pinch picks up a 5 cm microchip; a fist can't. The chip
-  seats when it is within 3 cm and 14° of the socket, shown live as Δxy / Δθ / tilt. Seating it powers
-  the controller. Heavy levers are revolute joints with a spring–damper motor: a fist on the knob pulls
-  through a spring, so they lag, resist and spring back. THROTTLE runs the line and PRESS stamps each blank.
 - **Operating Theatre** (`/theatre`). A bowel resection in a Blender-built operating room (baked
   Cycles lighting, twin surgical lights, vitals on the wall). Five steps: open the abdomen along the
   purple guide (skin, then fascia: nothing is cut off the guide), seat a Balfour retractor, cut out the
@@ -39,9 +35,9 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
   knuckles and melts.
 - **Lab** (`/lab`). A bare bench for checking tracking, with the debug overlay open.
 
-| Arcade | Industrial | Theatre | Rain |
-|---|---|---|---|
-| ![Arcade](docs/img/arcade.jpg) | ![Industrial](docs/img/industrial.jpg) | ![Theatre](docs/img/theatre.jpg) | ![Rain](docs/img/rain.jpg) |
+| Arcade | Theatre | Rain |
+|---|---|---|
+| ![Arcade](docs/img/arcade.jpg) | ![Theatre](docs/img/theatre.jpg) | ![Rain](docs/img/rain.jpg) |
 
 ## Run it locally
 
@@ -67,13 +63,11 @@ Camera access needs `localhost` or HTTPS. To try it on a phone, use the deployed
 3. **Arcade:** bring your hand onto a ball and close it halfway, like holding a real basketball. Flick
    forward *and up* and open your fingers to shoot. Open slowly and it just drops back to the rack. Aim
    assist defaults to *strong*; the HUD button cycles it.
-4. **Industrial:** pinch the chip (thumb to index), carry it to the socket, turn your hand until Δθ goes
-   green, lower it. Then make a fist on the purple knob and pull toward you. Do the same on the orange knob.
-5. **Theatre:** pinch the scalpel and draw it along the purple line on the abdomen, twice (skin, then
+4. **Theatre:** pinch the scalpel and draw it along the purple line on the abdomen, twice (skin, then
    fascia). Carry the Balfour retractor to the wound and let go. Squeeze the scissors shut on each purple
    ring, then lift the dark segment into the kidney dish with the forceps. Touch the needle to each
    glowing dot, then squeeze the stapler on each mark. The HUD says what's next at every step.
-6. **☂ Rain** and **❄ Snow** are in the top bar. **Debug** shows the landmark skeleton over your camera,
+5. **☂ Rain** and **❄ Snow** are in the top bar. **Debug** shows the landmark skeleton over your camera,
    gesture, fps, tracker latency and what each hand is holding.
 
 **No webcam, or the room's lighting is bad?** Every scene has two fallbacks:
@@ -112,15 +106,14 @@ replay ─▶ PlaybackSource (recorded JSON)                                  �
 | `src/lib/materials/chrome.ts` | Iridescent chrome with the weather shader (droplets, snow) |
 | `src/components/physics/HandPhysics.tsx` | Hand colliders and the grab system |
 | `src/components/scene/` | Shared scene shell, studio lighting, floor |
-| `src/scenes/{arcade,industrial,theatre}` | The three scenes, each a lazy, client-only route |
+| `src/scenes/{arcade,theatre}` | The two scenes, each a lazy, client-only route |
 | `src/components/landing/` | Landing page and its 3D stage |
 
 ### Design decisions worth knowing
 
 - **Rapier, not cannon-es.** Kinematic hands report real velocity, CCD stops thin tools tunnelling, and
-  revolute motors give levers spring and damping. See [docs/PLAN.md](docs/PLAN.md) for the comparison.
-- **Grabs are joints, never teleports.** Balls and the chip use a fixed joint to the hand's anchor. Levers
-  use a spring joint, so they resist.
+  contacts stop surgical tools at tissue. See [docs/PLAN.md](docs/PLAN.md) for the comparison.
+- **Grabs are joints, never teleports.** Balls use a fixed joint to the hand's anchor.
 - **Tools never clip.** A kinematic body goes wherever it is told, CCD or not. So surgical tools are
   dynamic bodies whose velocity is steered toward the hand every physics step. The contact solver stops
   them at tissue, with stiffer contacts and soft CCD in that scene.
@@ -166,7 +159,7 @@ The tracker model and WASM are cached as immutable assets (`next.config.ts`).
 
 - **Verified in a browser:** every scene with the simulated hand and the recorded session (e2e). The real
   MediaPipe pipeline on a recorded webcam clip: GPU delegate, ~30 tracker fps, ~20 ms per frame. Grabs,
-  throws, scoring, chip seating, levers, the press, tool penetration, incisions and forceps retrieval.
+  throws, scoring, tool penetration, incisions and forceps retrieval.
   Rain and snow, the landing page, and phone-sized layouts. 60 fps on an Apple-silicon MacBook in
   production mode.
 - **You need to try:** a live webcam in your room's lighting; how throwing *feels* with your own arm
@@ -176,9 +169,8 @@ The tracker model and WASM are cached as immutable assets (`next.config.ts`).
   granted. Depth calibration is taken from steady frames only, saved, and restored after a reload. If
   the camera is still held by the previous page, it retries a few times.
 - **Known limits:** in the Arcade the robot hands are kept out of the rack, its stand, the balls and the
-  floor (a cyan ghost shows where your real hand is), but in the Industrial and Theatre scenes they can
-  still pass through the furniture: an upright webcam hand has to dip below the workbench to pinch a chip
-  off it, so blocking the bench would make the chip unreachable. Tracking is weakest with strong backlight and side-on pinches. A tool glancing the patient at full
+  floor (a cyan ghost shows where your real hand is), but in the Theatre they can still pass
+  through the furniture. Tracking is weakest with strong backlight and side-on pinches. A tool glancing the patient at full
   speed can momentarily overlap by a few mm before the solver pushes it out (shown as *max* in the
   Theatre HUD).
 
