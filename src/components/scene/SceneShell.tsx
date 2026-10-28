@@ -33,6 +33,8 @@ export interface SceneShellProps {
   debug?: boolean;
   /** Solver tuning for this scene. */
   physics?: Partial<PhysicsProps>;
+  /** The scene's own lights and environment, in place of the shared studio. */
+  lighting?: ReactNode;
 }
 
 export function SceneShell(props: SceneShellProps) {
@@ -44,7 +46,7 @@ export function SceneShell(props: SceneShellProps) {
   );
 }
 
-function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, physics, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
+function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, physics, lighting, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
   const [dpr, setDpr] = useState(1.5);
   const tracking = useTracking();
   const source = useHandStore((s) => s.source);
@@ -89,7 +91,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
         onCreated={({ camera }) => cam.lookAt && camera.lookAt(...cam.lookAt)}
       >
         <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(isTouchDevice() ? 1.5 : 2)} />
-        <Studio />
+        {lighting ? <Suspense fallback={null}>{lighting}</Suspense> : <Studio />}
         <Weather />
         <Suspense fallback={null}>
           <Physics gravity={[0, -9.81, 0]} timeStep={1 / 90} interpolate {...physics}>
