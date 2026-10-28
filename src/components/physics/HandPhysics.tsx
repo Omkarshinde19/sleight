@@ -26,17 +26,14 @@ export interface Grabbable {
   body: () => RapierRigidBody | null;
   /** Gestures that can pick this up. */
   gestures: Gesture[];
-  /** How close the grip point must be to the body's centre (or `grabPoint`), metres. */
+  /** How close the grip point must be to the body's centre, metres. */
   reach: number;
-  /** Where to measure reach from, if not the body's centre (e.g. a lever's knob). */
-  grabPoint?: () => Point;
   /**
    * - "fixed": rigid joint to the hand.
-   * - spring: lets the object lag and resist (levers).
    * - "drive": no joint; the object's velocity is steered toward the hand every step, so contacts
    *   (with CCD) stop it at whatever it hits. Used for surgical tools that must never clip.
    */
-  attach?: "fixed" | "drive" | { stiffness: number; damping: number };
+  attach?: "fixed" | "drive";
   /** Gestures that keep holding once picked up (default: `gestures`). */
   holdGestures?: Gesture[];
   /**
@@ -55,13 +52,11 @@ export interface Grabbable {
    * inside the hand to 24 cm off it).
    */
   cradle?: { radius: number };
-  /** For spring attachments: the grab point on the body, in its local frame. */
-  localHandle?: Point;
   /** Give the object the hand's velocity on release. */
   throwable?: ThrowOptions | false;
-  /** Keep the default HELD collision group while attached? (off for levers fixed in place). */
+  /** Keep the default HELD collision group while attached? (off for surgical tools). */
   switchGroups?: boolean;
-  /** Checked every step while held; true makes the hand let go (e.g. a chip clicking into its socket). */
+  /** Checked every step while held; true makes the hand let go (e.g. a tool set down on its tray). */
   shouldRelease?: () => boolean;
   /** Checked before picking up; false leaves it where it is (e.g. one surgical instrument at a time). */
   canGrab?: () => boolean;
@@ -249,22 +244,16 @@ export function HandPhysics({ scale = 0.94, children }: { scale?: number; childr
       handStore.setState((s) => ({ holding: { ...s.holding, [hand]: item.name } }));
       return;
     }
-    let params;
-    if (item.attach && item.attach !== "fixed") {
-      const local = item.localHandle ?? { x: 0, y: 0, z: 0 };
-      params = rapier.JointData.spring(0, item.attach.stiffness, item.attach.damping, { x: 0, y: 0, z: 0 }, local);
-    } else {
-      const o = body.translation();
-      const r = body.rotation();
-      const offset = new THREE.Vector3(o.x - a.x, o.y - a.y, o.z - a.z).applyQuaternion(inv);
-      const frame1 = inv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w));
-      params = rapier.JointData.fixed(
-        { x: offset.x, y: offset.y, z: offset.z },
-        { x: frame1.x, y: frame1.y, z: frame1.z, w: frame1.w },
-        { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0, z: 0, w: 1 },
-      );
-    }
+    const o = body.translation();
+    const r = body.rotation();
+    const offset = new THREE.Vector3(o.x - a.x, o.y - a.y, o.z - a.z).applyQuaternion(inv);
+    const frame1 = inv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w));
+    const params = rapier.JointData.fixed(
+      { x: offset.x, y: offset.y, z: offset.z },
+      { x: frame1.x, y: frame1.y, z: frame1.z, w: frame1.w },
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 0, w: 1 },
+    );
     const joint = world.createImpulseJoint(params, anchor as unknown as RapierBody, body as unknown as RapierBody, true);
     if (item.switchGroups !== false) setGroups(body, item.heldGroups ?? GROUPS.held);
     body.wakeUp();
@@ -412,7 +401,7 @@ export function HandPhysics({ scale = 0.94, children }: { scale?: number; childr
           if (!wants) continue;
           const b = item.body();
           if (!b) continue;
-          const p = item.grabPoint?.() ?? b.translation();
+          const p = b.translation();
           // for a cradled object the palm counts as much as the grip point
           const from = item.grip ? pose.palm : pose.grip;
           const d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
