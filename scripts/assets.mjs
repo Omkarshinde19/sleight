@@ -3,7 +3,8 @@
 //   npm run assets            # all .blend files
 //   npm run assets -- hand    # just assets/blender/hand.blend
 //
-// Step 1 exports with headless Blender (scripts/blender/export.py); step 2 compresses with
+// Step 1 exports with headless Blender (scripts/blender/export.py); step 2 prunes unused data but keeps
+// empty leaf nodes (marker empties: light positions, tool tips, stitch points); step 3 compresses with
 // gltf-transform: meshopt geometry (drei's useGLTF decodes it by default) and WebP textures, no
 // simplify/join/flatten/palette, so node, bone and material names survive — code looks them up by name.
 // BLENDER overrides the Blender binary (default: the macOS app bundle).
@@ -34,17 +35,20 @@ const tmp = mkdtempSync(join(tmpdir(), "sleight-assets-"));
 try {
   for (const name of names) {
     const raw = join(tmp, `${name}.glb`);
+    const pruned = join(tmp, `${name}.pruned.glb`);
     const out = join(outDir, `${name}.glb`);
     execFileSync(blender, ["-b", join(srcDir, `${name}.blend`), "--python", join(root, "scripts/blender/export.py"), "--", raw], {
       stdio: ["ignore", "ignore", "inherit"],
     });
+    execFileSync(gltfTransform, ["prune", raw, pruned, "--keep-leaves", "true"], { stdio: ["ignore", "ignore", "inherit"] });
     execFileSync(
       gltfTransform,
       [
-        "optimize", raw, out,
+        "optimize", pruned, out,
         "--compress", "meshopt",
         "--texture-compress", "webp",
-        "--texture-size", "2048",
+        "--texture-size", "4096",
+        "--prune", "false",
         "--simplify", "false",
         "--join", "false",
         "--flatten", "false",
