@@ -1,12 +1,12 @@
 "use client";
 
 import { HandPhysics } from "@/components/physics/HandPhysics";
-import { Floor } from "@/components/scene/Floor";
 import { SceneShell } from "@/components/scene/SceneShell";
 import type { Workspace } from "@/lib/hand/mapping";
 import { Forceps, Fragments, instruments, Scalpel, TrayAndDish } from "./Instruments";
 import { Monitor } from "./Monitor";
 import { Patient } from "./Patient";
+import { Room } from "./Room";
 import { TheatreHud } from "./TheatreHud";
 import { useTheatre } from "./theatreStore";
 
@@ -22,23 +22,6 @@ const WORKSPACE: Workspace = {
 
 if (typeof window !== "undefined") Object.assign(window, { __theatre: useTheatre, __instruments: instruments });
 
-/** Theatre lights: a big round surgical lamp overhead, cool and even. */
-function Lamp() {
-  return (
-    <group position={[-0.05, 2.1, -0.4]}>
-      <mesh rotation-x={Math.PI / 2}>
-        <torusGeometry args={[0.32, 0.03, 16, 64]} />
-        <meshStandardMaterial color="#d7dbe6" metalness={1} roughness={0.2} />
-      </mesh>
-      <mesh rotation-x={Math.PI / 2}>
-        <circleGeometry args={[0.3, 48]} />
-        <meshBasicMaterial color="#eef6ff" toneMapped={false} />
-      </mesh>
-      <spotLight position={[0, 0, 0]} angle={0.5} penumbra={0.6} intensity={18} distance={3} color="#f2f7ff" castShadow target-position={[-0.05, 1, -0.4]} />
-    </group>
-  );
-}
-
 export default function TheatreScene() {
   return (
     <SceneShell
@@ -52,14 +35,13 @@ export default function TheatreScene() {
       physics={{ numSolverIterations: 8, allowedLinearError: 0.0002, contactNaturalFrequency: 60 }}
     >
       <HandPhysics scale={WORKSPACE.handScale}>
-        <Floor />
+        <Room />
         <Patient />
         <TrayAndDish />
         <Scalpel />
         <Forceps />
         <Fragments />
         <Monitor />
-        <Lamp />
       </HandPhysics>
     </SceneShell>
   );
