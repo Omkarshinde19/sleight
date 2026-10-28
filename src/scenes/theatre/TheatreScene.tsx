@@ -3,12 +3,12 @@
 import { HandPhysics } from "@/components/physics/HandPhysics";
 import { SceneShell } from "@/components/scene/SceneShell";
 import type { Workspace } from "@/lib/hand/mapping";
-import { Forceps, Fragments, instruments, Scalpel, TrayAndDish } from "./Instruments";
 import { Monitor } from "./Monitor";
-import { Patient } from "./Patient";
-import { Room } from "./Room";
+import { anatomy, Patient } from "./Patient";
+import { Room, TheatreLighting } from "./Room";
 import { TheatreHud } from "./TheatreHud";
 import { useTheatre } from "./theatreStore";
+import { Instruments, toolPoint, tools } from "./Tools";
 
 /** Smaller robot hands and a tighter workspace: this scene is about precision. */
 const WORKSPACE: Workspace = {
@@ -20,27 +20,25 @@ const WORKSPACE: Workspace = {
   handScale: 1.2,
 };
 
-if (typeof window !== "undefined") Object.assign(window, { __theatre: useTheatre, __instruments: instruments });
+if (typeof window !== "undefined") Object.assign(window, { __theatre: useTheatre, __tools: { tools, point: (n: Parameters<typeof toolPoint>[0]) => toolPoint(n).toArray(), anatomy } });
 
 export default function TheatreScene() {
   return (
     <SceneShell
       title="Operating Theatre"
-      brief="Hands never touch the patient. Pinch the scalpel and run it along the dotted line on the practice pad, then pinch the forceps, squeeze to grip each fragment in the wound and drop it in the kidney dish. The instruments stop at tissue — watch the ghost when you push."
+      brief="A bowel resection in five steps: open the abdomen along the purple line, hold it open with the Balfour retractor, cut out the dead segment of bowel, stitch the healthy ends together and staple the skin. Pinch an instrument to pick it up, squeeze to close it. Hands never touch the patient, and nothing is cut off the guides."
       demo="/sessions/demo.json"
       workspace={WORKSPACE}
       camera={{ position: [0.02, 1.7, 0.8], fov: 62, lookAt: [0.05, 1.33, -1.2] }}
       hud={<TheatreHud />}
+      lighting={<TheatreLighting />}
       // Stiffer, more precise contacts than the other scenes: tools pushed into tissue should stop at it.
       physics={{ numSolverIterations: 8, allowedLinearError: 0.0002, contactNaturalFrequency: 60 }}
     >
       <HandPhysics scale={WORKSPACE.handScale}>
         <Room />
         <Patient />
-        <TrayAndDish />
-        <Scalpel />
-        <Forceps />
-        <Fragments />
+        <Instruments />
         <Monitor />
       </HandPhysics>
     </SceneShell>
