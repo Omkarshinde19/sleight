@@ -37,12 +37,14 @@ export interface SceneShellProps {
   physics?: Partial<PhysicsProps>;
   /** The scene's own lights and environment, in place of the shared studio. */
   lighting?: ReactNode;
+  /** Hands the camera tracks (default 2). One-handed scenes track faster with 1. */
+  hands?: 1 | 2;
 }
 
 export function SceneShell(props: SceneShellProps) {
   const surface = useRef<HTMLDivElement>(null);
   return (
-    <HandTrackingProvider workspace={props.workspace} surface={surface}>
+    <HandTrackingProvider workspace={props.workspace} surface={surface} maxHands={props.hands}>
       <SceneInner {...props} surface={surface} />
     </HandTrackingProvider>
   );
@@ -50,11 +52,14 @@ export function SceneShell(props: SceneShellProps) {
 
 function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE, camera, demo, debug, physics, lighting, surface }: SceneShellProps & { surface: React.RefObject<HTMLDivElement | null> }) {
   const [dpr, setDpr] = useState(1.5);
+  // The camera's tracker shares the GPU with this canvas. If it falls behind, draw fewer pixels.
+  const trackerBound = useTrackerBudget();
   const tracking = useTracking();
   const source = useHandStore((s) => s.source);
   const status = useHandStore((s) => s.status);
   const calibrating = useHandStore((s) => s.calibrating && s.source === "camera" && Object.keys(s.hands).length > 0);
   const moved = useView(viewMoved);
+  const nearEdge = useHandStore((s) => s.source === "camera" && Object.values(s.hands).some((h) => h?.nearEdge));
 
   // ?source=sim|camera|demo starts straight away (used for demos and automated checks).
   useEffect(() => {
@@ -88,7 +93,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
     <div ref={surface} className={styles.sceneRoot} data-source={source ?? "none"}>
       <Canvas
         shadows
-        dpr={[1, dpr]}
+        dpr={[1, trackerBound ? 1 : dpr]}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         camera={{ position: cam.position, fov: cam.fov ?? 50, near: 0.05, far: 60 }}
       >
@@ -126,6 +131,11 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
           Reset view
         </button>
       )}
+      {nearEdge && !calibrating && (
+        <p className={`${styles.calibrating} glass mono`} role="status" data-testid="edge-hint">
+          Keep your hand inside the camera&apos;s view
+        </p>
+      )}
       {calibrating && (
         <p className={`${styles.calibrating} glass mono`} role="status">
           Hold your hand still for a second — calibrating depth
@@ -139,4 +149,30 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
       {(!source || status === "denied" || status === "error") && <SourceChooser title={title} brief={brief} demo={demo} />}
     </div>
   );
+}
+
+/** Tracker frame rate below which the canvas drops to 1x pixel ratio, and how long it must last (ms). */
+const SLOW_TRACKER_FPS = 20;
+const SLOW_FOR_MS = 2000;
+
+/**
+ * True once the camera tracker has run slower than SLOW_TRACKER_FPS for SLOW_FOR_MS with a hand in
+ * view. It stays true for the session: switching back would only make the tracker slow again.
+ */
+function useTrackerBudget() {
+  const [bound, setBound] = useState(false);
+  useEffect(() => {
+    if (bound) return;
+    let slowSince: number | null = null;
+    const id = setInterval(() => {
+      const s = useHandStore.getState();
+      const slow = s.source === "camera" && Object.keys(s.hands).length > 0 && s.trackerFps > 0 && s.trackerFps < SLOW_TRACKER_FPS;
+      const now = performance.now();
+      if (!slow) slowSince = null;
+      else if (slowSince === null) slowSince = now;
+      else if (now - slowSince > SLOW_FOR_MS) setBound(true);
+    }, 250);
+    return () => clearInterval(id);
+  }, [bound]);
+  return bound;
 }

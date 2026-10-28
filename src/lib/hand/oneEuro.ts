@@ -62,6 +62,15 @@ export class PointsFilter {
     }
   }
 
+  /** Change the x/y settings (z keeps its own), e.g. to smooth harder for precise work. */
+  tune(minCutoff: number, beta: number) {
+    for (let i = 0; i < this.count; i++)
+      for (const f of [this.filters[i * 3], this.filters[i * 3 + 1]]) {
+        f.minCutoff = minCutoff;
+        f.beta = beta;
+      }
+  }
+
   filter(points: Point[], tSec: number): Point[] {
     return points.map((p, i) => ({
       x: this.filters[i * 3].filter(p.x, tSec),

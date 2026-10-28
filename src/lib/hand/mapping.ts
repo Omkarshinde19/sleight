@@ -12,7 +12,25 @@ export interface Workspace {
   depthRange: number;
   /** Size multiplier for the robot hand relative to the real hand. */
   handScale: number;
+  /**
+   * Fraction of the camera frame at each edge that lies outside the workspace (default EDGE): the
+   * middle of the frame covers the whole workspace, so reaching its edges (the hoop) doesn't take the
+   * hand out of the camera's view, where tracking drops out.
+   */
+  edge?: number;
+  /**
+   * Pitch the hand forward by this much (radians) about its palm: an upright hand facing the webcam
+   * becomes a hand reaching down onto a table, palm down.
+   */
+  tilt?: number;
+  /**
+   * Motion scaling while holding something, like a surgical robot's: slow moves are scaled by `scale`
+   * (fine control, and the tracker's jitter shrinks with them); moves at `fullSpeed` m/s or faster are not.
+   */
+  precision?: { scale: number; fullSpeed: number };
 }
+
+export const EDGE = 0.08;
 
 export const DEFAULT_WORKSPACE: Workspace = {
   center: { x: 0, y: 1.1, z: 0 },
@@ -39,9 +57,10 @@ export const cameraToScene = (p: Point): Point => ({ x: -p.x, y: -p.y, z: p.z })
 
 /** Anchor of the hand in the scene, from the image palm centre and relative depth. */
 export function anchorInScene(imagePalm: Point, relDepth: number, ws: Workspace): Point {
+  const stretch = 1 / (1 - 2 * (ws.edge ?? EDGE));
   return {
-    x: ws.center.x + (0.5 - imagePalm.x) * ws.width,
-    y: ws.center.y + (0.5 - imagePalm.y) * ws.height,
+    x: ws.center.x + (0.5 - imagePalm.x) * ws.width * stretch,
+    y: ws.center.y + (0.5 - imagePalm.y) * ws.height * stretch,
     z: ws.center.z + clamp(relDepth * ws.depthGain, -ws.depthRange, ws.depthRange),
   };
 }
@@ -52,12 +71,17 @@ export function anchorInScene(imagePalm: Point, relDepth: number, ws: Workspace)
  */
 export function jointsInScene(world: Point[], anchor: Point, ws: Workspace): Point[] {
   const c = palmCenter(world);
+  // about scene x, fingers (+y) toward -z: into the scene, then down
+  const cos = Math.cos(ws.tilt ?? 0);
+  const sin = Math.sin(ws.tilt ?? 0);
   return world.map((p) => {
     const s = cameraToScene({ x: p.x - c.x, y: p.y - c.y, z: p.z - c.z });
+    const y = s.y * cos + s.z * sin;
+    const z = s.z * cos - s.y * sin;
     return {
       x: anchor.x + s.x * ws.handScale,
-      y: anchor.y + s.y * ws.handScale,
-      z: anchor.z + s.z * ws.handScale,
+      y: anchor.y + y * ws.handScale,
+      z: anchor.z + z * ws.handScale,
     };
   });
 }

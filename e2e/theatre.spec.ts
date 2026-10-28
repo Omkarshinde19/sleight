@@ -49,10 +49,13 @@ const gesture = (page: Page, g: string, hand = "Right") => page.evaluate(([g, h]
 const body = (page: Page, t: Tool) => page.evaluate((t) => { const p = (window as unknown as W).__tools.tools[t as Tool].body.translation(); return { x: p.x, y: p.y, z: p.z }; }, t);
 const point = (page: Page, t: Tool) => page.evaluate((t) => { const [x, y, z] = (window as unknown as W).__tools.point(t as Tool); return { x, y, z }; }, t);
 
-/** Closed-loop reach on the measured palm position. */
+/**
+ * Closed-loop reach on the measured palm position. Holding an instrument, slow moves are scaled down
+ * (precision mode), so each correction only gets part of the way: it takes a few more rounds.
+ */
 async function reach(page: Page, p: P, hand = "Right") {
   let c = { ...p };
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 10; i++) {
     await page.evaluate(([c, h]) => { const s = (window as unknown as W).__sleight; s.api.sim.reach(h as string, c as P, s.api.workspace); }, [c, hand] as const);
     await page.waitForTimeout(250);
     const q = await palm(page, hand);
@@ -120,6 +123,8 @@ test("a scalpel pushed into the skin stops at its surface", async ({ page }) => 
 });
 
 test("the scalpel opens the skin only along the guide, then the fascia", async ({ page }) => {
+  // 44 careful moves, each a few rounds of reach under precision mode's motion scaling
+  test.setTimeout(150_000);
   await setup(page);
   await pickUp(page, "Scalpel");
   const edge = await pointOffset(page, "Scalpel");

@@ -82,14 +82,25 @@ export function HandTrackingProvider({
   children,
   workspace,
   surface,
+  maxHands = 2,
 }: {
   children: ReactNode;
   workspace?: Workspace;
+  /**
+   * Hands the camera tracks. With 2, MediaPipe runs its (slow) palm detector on every frame that has
+   * only one hand, looking for the other, so a one-handed scene asks for 1.
+   */
+  maxHands?: 1 | 2;
   /** Element that receives mouse/keyboard input for the simulated hand. */
   surface: React.RefObject<HTMLElement | null>;
 }) {
   const sourceRef = useRef<TrackingSource | null>(null);
-  const processor = useMemo(() => new HandProcessor(workspace, feel, onLabelSwap), [workspace]);
+  const processor = useMemo(() => {
+    const p = new HandProcessor(workspace, feel, onLabelSwap);
+    // longer coasting and precision mode while a hand holds something
+    p.holding = (h) => !!handStore.getState().holding[h];
+    return p;
+  }, [workspace]);
   const recorder = useMemo(() => new Recorder(), []);
   const lastFrameT = useRef(0);
   const clock = useMemo(() => new FrameClock(), []);
@@ -137,6 +148,7 @@ export function HandTrackingProvider({
       handPose.handScale = processor.workspace.handScale;
       processor.setPersistence(source.kind === "camera");
       processor.setSynthetic(source.kind === "sim");
+      if (source instanceof CameraSource) source.onDelegate = (delegate) => handStore.setState({ delegate });
       if (source instanceof CameraSource)
         source.onError = (message) => {
           if (sourceRef.current !== source) return;
@@ -163,7 +175,7 @@ export function HandTrackingProvider({
 
   const api = useMemo<TrackingApi>(
     () => ({
-      startCamera: () => run(new CameraSource(isTouchDevice() ? 1 : 2)),
+      startCamera: () => run(new CameraSource(isTouchDevice() ? 1 : maxHands)),
       startSim: async () => {
         if (!surface.current) return;
         const s = new SimulatedSource(surface.current, !isTouchDevice());
@@ -188,7 +200,7 @@ export function HandTrackingProvider({
       video,
       workspace: processor.workspace,
     }),
-    [run, stop, processor, recorder, sim, video, surface],
+    [run, stop, processor, recorder, sim, video, surface, maxHands],
   );
 
   useEffect(() => () => sourceRef.current?.stop(), []);

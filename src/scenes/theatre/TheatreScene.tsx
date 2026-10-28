@@ -18,6 +18,11 @@ const WORKSPACE: Workspace = {
   depthGain: 1.0,
   depthRange: 0.4,
   handScale: 0.75, // was 1.2: hands 1.6× smaller
+  // An upright hand at the webcam leans forward over the patient (~46°). More tipped the held tool
+  // farther from the palm, so the wrist's small turns as you squeeze swung its tip by centimetres.
+  tilt: 0.8,
+  // Holding an instrument, slow moves are halved (and the tracker's shake with them); fast ones aren't.
+  precision: { scale: 0.5, fullSpeed: 0.35 },
 };
 
 if (typeof window !== "undefined") Object.assign(window, { __theatre: useTheatre, __tools: { tools, point: (n: Parameters<typeof toolPoint>[0]) => toolPoint(n).toArray(), anatomy } });
@@ -31,6 +36,8 @@ export default function TheatreScene() {
       workspace={WORKSPACE}
       camera={{ position: [0.02, 1.7, 0.8], fov: 62, lookAt: [0.05, 1.33, -1.2] }}
       hud={<TheatreHud />}
+      // One instrument at a time, so one hand: the tracker doesn't search every frame for a second.
+      hands={1}
       lighting={<TheatreLighting />}
       // Stiffer, more precise contacts than the other scenes: tools pushed into tissue should stop at it.
       physics={{ numSolverIterations: 8, allowedLinearError: 0.0002, contactNaturalFrequency: 60 }}

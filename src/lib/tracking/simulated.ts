@@ -1,5 +1,5 @@
 import { CLAW, lerpPose, POSES, synthHand, type HandPose, type Orientation } from "../hand/synth";
-import type { Workspace } from "../hand/mapping";
+import { EDGE, type Workspace } from "../hand/mapping";
 import { clamp, type Gesture, type Handedness, type Point, type RawFrame } from "../hand/types";
 import type { TrackingSource } from "./source";
 
@@ -126,9 +126,10 @@ export class SimulatedSource implements TrackingSource {
    */
   reach(hand: Handedness, p: Point, ws: Workspace, calibratedDistance = 0.5) {
     this.hands[hand].visible = true;
+    const stretch = 1 / (1 - 2 * (ws.edge ?? EDGE));
     this.goals[hand] = {
-      imageX: clamp(0.5 - (p.x - ws.center.x) / ws.width, 0.02, 0.98),
-      imageY: clamp(0.5 - (p.y - ws.center.y) / ws.height, 0.02, 0.98),
+      imageX: clamp(0.5 - (p.x - ws.center.x) / (ws.width * stretch), 0.02, 0.98),
+      imageY: clamp(0.5 - (p.y - ws.center.y) / (ws.height * stretch), 0.02, 0.98),
       distance: clamp(calibratedDistance * (1 + (p.z - ws.center.z) / ws.depthGain), NEAR, FAR),
     };
   }
