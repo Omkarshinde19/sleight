@@ -72,9 +72,9 @@ function Driver() {
   return null;
 }
 
-export default function LandingStage() {
+export default function LandingStage({ active }: { active: boolean }) {
   return (
-    <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.2, 1.55], fov: 42, near: 0.05, far: 30 }} gl={{ antialias: true, alpha: true }}>
+    <Canvas dpr={[1, 1.6]} frameloop={active ? "always" : "never"} camera={{ position: [0, 1.2, 1.55], fov: 42, near: 0.05, far: 30 }} gl={{ antialias: true, alpha: true }}>
       <Studio intensity={1.1} />
       <Weather />
       <Suspense fallback={null}>

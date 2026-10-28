@@ -121,6 +121,9 @@
   line-height: 0.82;
   letter-spacing: -0.035em;
   user-select: none;
+  /* a black outline keeps the type legible where a blob of the same colour passes under it */
+  -webkit-text-stroke: 0.035em var(--jet);
+  paint-order: stroke fill;
 }
 
 .lineTop,
@@ -144,6 +147,13 @@
   bottom: 13vh;
   right: calc(var(--gutter) - 0.02em);
   color: var(--lime);
+}
+
+.blobs {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .stage {

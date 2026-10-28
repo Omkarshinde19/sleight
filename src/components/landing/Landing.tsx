@@ -9,6 +9,7 @@ import { hero } from "./hero";
 import styles from "./landing.module.css";
 
 const LandingStage = dynamic(() => import("./LandingStage"), { ssr: false });
+const Blobs = dynamic(() => import("./Blobs"), { ssr: false });
 
 const ROOMS = [
   {
@@ -67,6 +68,7 @@ const TICKER = ["Real hands", "Real physics", "Nothing uploaded", "Runs in your 
 export function Landing() {
   const heroRef = useRef<HTMLElement>(null);
   const [showStage, setShowStage] = useState(false);
+  const [heroInView, setHeroInView] = useState(true);
   const weather = useWeather((s) => s.kind);
   const setWeather = useWeather((s) => s.setKind);
 
@@ -74,7 +76,10 @@ export function Landing() {
     // Let the type paint first, then bring in the 3D.
     const id = requestAnimationFrame(() => setShowStage(true));
     const el = heroRef.current;
-    const io = new IntersectionObserver(([e]) => (hero.inView = e.isIntersecting));
+    const io = new IntersectionObserver(([e]) => {
+      hero.inView = e.isIntersecting;
+      setHeroInView(e.isIntersecting);
+    });
     if (el) io.observe(el);
     return () => {
       cancelAnimationFrame(id);
@@ -105,12 +110,15 @@ export function Landing() {
       </header>
 
       <section ref={heroRef} className={styles.hero}>
+        <div className={styles.blobs} aria-hidden>
+          {showStage && <Blobs active={heroInView} />}
+        </div>
         <h1 className={styles.headline}>
           <span className={styles.lineTop}>Sleight</span>
           <span className={styles.lineBottom}>of hand</span>
         </h1>
         <div className={styles.stage} aria-hidden>
-          {showStage && <LandingStage />}
+          {showStage && <LandingStage active={heroInView} />}
         </div>
 
         <p className={styles.stack}>
