@@ -68,25 +68,36 @@ Step 2 (UI palette: **confirm colours with the user before writing any tokens**)
 
 ## The surgery room today (`src/scenes/theatre/`)
 
-- `TheatreScene.tsx`: tighter workspace (`handScale` 1.2, width 1.2 m), surgical lamp, stiffer physics
-  (`numSolverIterations: 8`, small allowed error) so tools stop at tissue. Brief: pinch the scalpel and
-  cut along the dotted line on the practice pad, then pinch the forceps, squeeze to grip fragments in the
-  wound, drop them in the kidney dish. Hands never touch the patient (sterile field).
-- `layout.ts`: table, torso, practice pad, 18 cm guide line, wound, instrument tray, kidney dish (metres).
-- `Instruments.tsx`: scalpel and forceps (held tools, with a translucent "ghost" when the patient is in
-  the way), fragments, tray and dish. `instruments` handles exposed for the monitor and tests.
-- `Patient.tsx`: mannequin, drape, dotted guide; `anatomyColliders` for contact depth / sterile checks.
-- `Monitor.tsx`: penetration depth (from contact manifolds), sterile-field breaches, incision coverage
-  and accuracy, fragments retrieved → `theatreStore.ts` → `TheatreHud.tsx`.
-- Tests: `e2e/theatre.spec.ts` (scalpel stops at the pad surface; cuts along the line; forceps move a
-  fragment to the dish). Exposed on `window`: `__theatre` (store), `__instruments`, `__sleight`.
-- Grabs/colliders shared with other scenes: `src/components/physics/HandPhysics.tsx`.
-- The instruments and patient are still code-built geometry (Blender props are Step 1.5).
+Rebuilt on 2026-10-28 from `docs/PLAN-theatre.md` (all phases done and live): a bowel resection in a
+Blender-built operating room. Models and their contracts: `docs/BLENDER.md`.
+
+- `TheatreScene.tsx`: workspace (`handScale` 1.2, width 1.2 m), camera C2 (at (0.02, 1.7, 0.8) looking
+  at (0.05, 1.33, −1.2), fov 62), stiff physics so tools stop at tissue, its own lighting.
+- `Room.tsx`: `theatre-room.glb` (baked, drawn unlit), live spotlights at the baked lamps, the room HDR
+  at ×0.1, a shadow-only sheet on the floor, the ground collider.
+- `Patient.tsx`: `patient.glb`; eases its shape keys (`anatomy.skin/fascia/proximal/distal`), shows
+  guides and clamps per step, and the body's collider boxes per wound state (closed, skin cut with a
+  ±1 cm slit, fascia cut, retracted). Read the colliders off `anatomy.body` each frame: holding a removed
+  collider and querying it panics Rapier.
+- `Tools.tsx`: `instruments.glb`; one generic `Tool` (drive attach, ghost, squeeze closes jaws or pulls
+  the trigger), one at a time (`canGrab`), back to the tray when let go; the Balfour seats and stays.
+  Collider boxes per tool in `TOOL_SPECS` (the scalpel's blade box is only its cutting belly so it drops
+  into the slit whichever way it points).
+- `procedure.ts` (pure, unit-tested): steps, guide coverage → `Open_k` weights, blade contact (cuts only
+  while touching, only on the guide; fascia only from inside the slit), staple closure, score.
+- `Monitor.tsx`: runs the steps each frame, penetration and sterile checks, thread/knots/staples/target
+  marker → `theatreStore.ts` (with `goto(step)` for tests and "Operate again") → `TheatreHud.tsx`.
+- Tests: `e2e/theatre.spec.ts` (each step via `goto`, guide limits, one tool at a time, perf budget:
+  <200 draw calls, <350k triangles, median frame <25 ms, theatre assets <4 MB). Exposed on `window`:
+  `__theatre` (store), `__tools` (`tools`, `point(name)`, `anatomy`), `__sleight`.
+- Grabs/colliders shared with other scenes: `src/components/physics/HandPhysics.tsx` (`canGrab` added).
 
 ## Known issues to keep in mind
 
-- `e2e/theatre.spec.ts` "a scalpel pushed 5 cm into the practice pad stops at its surface" flakes about
-  1 in 3 runs, with or without the recent hand changes (pre-existing). Industrial "fist can't pick up the
+- `e2e/theatre.spec.ts` "one instrument at a time" timed out once against the live site, then passed
+  twice; the old scalpel-into-pad flake went with the old theatre.
+- The operating field sits low in camera C2: the cut rings and stitch dots are small. A "lean in"
+  camera for steps 3–5 is a possible follow-up (not asked for). Industrial "fist can't pick up the
   microchip" flakes ~1 in 17 since the snappier smoothing.
 - On the landing page's scrolled "Machinist" chapter the forearm reads as a short stub (elbow behind).
 - About 14 % of the left hand's tight-fist frames in the recorded session sit borderline (fingertip level

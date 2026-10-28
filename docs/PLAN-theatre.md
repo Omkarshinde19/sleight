@@ -1,5 +1,11 @@
 # The new surgery room: bowel resection and anastomosis
 
+> **Progress (2026-10-28):** all phases built and live. Room with baked lighting and twin surgical
+> lights (1.1–1.4, perf budget 1.5 in e2e), patient and instrument models (2, 3), the procedure engine and
+> all five steps (4–9), tests and docs (10). Changes from the plan: the vitals moved onto the wall
+> monitor (a boom monitor covered the painting or the wall monitor from the camera), and the painting
+> hangs on the front wall (camera C2). See `docs/HANDOFF-theatre.md`.
+
 Replaces the current `/theatre` (practice pad + fragments) with a real operating room and a five-step
 operation: midline laparotomy → retraction → bowel resection → anastomosis → wound closure.
 Planned 2026-10-28. Rules from `docs/HANDOFF-theatre.md` still apply: ask before every change, small

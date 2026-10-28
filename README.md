@@ -24,11 +24,14 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
   seats when it is within 3 cm and 14° of the socket, shown live as Δxy / Δθ / tilt. Seating it powers
   the controller. Heavy levers are revolute joints with a spring–damper motor: a fist on the knob pulls
   through a spring, so they lag, resist and spring back. THROTTLE runs the line and PRESS stamps each blank.
-- **Operating Theatre** (`/theatre`). Hands never touch the patient; tools do. Pinch the scalpel and cut
-  along the dotted line (scored for coverage and ± mm). Pinch the forceps, squeeze to grip a fragment in
-  the wound, and drop it in the kidney dish. Tools stop at tissue, with live penetration from the physics
-  contacts. A ghost shows where your hand wants the tool, and a hand inside the patient raises a
-  sterile-field breach.
+- **Operating Theatre** (`/theatre`). A bowel resection in a Blender-built operating room (baked
+  Cycles lighting, twin surgical lights, vitals on the wall). Five steps: open the abdomen along the
+  purple guide (skin, then fascia: nothing is cut off the guide), seat a Balfour retractor, cut out the
+  dead segment of bowel with scissors and lift it into the kidney dish with forceps, stitch the healthy
+  ends together with the needle driver, and staple the skin. One instrument at a time, picked up with a
+  pinch and closed with a squeeze; put down, it goes back to the Mayo tray. Tools stop at tissue, with
+  live penetration from the physics contacts; a hand inside the patient raises a sterile-field breach.
+  The HUD scores accuracy, strays off the guides and breaches.
 - **Weather in every scene.** Rain beads on the chrome and dries when it stops; snow settles on the
   knuckles and melts.
 - **Lab** (`/lab`). A bare bench for checking tracking, with the debug overlay open.
@@ -63,9 +66,10 @@ Camera access needs `localhost` or HTTPS. To try it on a phone, use the deployed
    assist defaults to *strong*; the HUD button cycles it.
 4. **Industrial:** pinch the chip (thumb to index), carry it to the socket, turn your hand until Δθ goes
    green, lower it. Then make a fist on the purple knob and pull toward you. Do the same on the orange knob.
-5. **Theatre:** pinch the scalpel and draw along the dotted line on the pad. Push down hard and watch the
-   ghost separate from the real blade while penetration stays near 0 mm. Then use the forceps: pinch to
-   hold, squeeze (fist) to close the jaws.
+5. **Theatre:** pinch the scalpel and draw it along the purple line on the abdomen, twice (skin, then
+   fascia). Carry the Balfour retractor to the wound and let go. Squeeze the scissors shut on each purple
+   ring, then lift the dark segment into the kidney dish with the forceps. Touch the needle to each
+   glowing dot, then squeeze the stapler on each mark. The HUD says what's next at every step.
 6. **☂ Rain** and **❄ Snow** are in the top bar. **Debug** shows the landmark skeleton over your camera,
    gesture, fps, tracker latency and what each hand is holding.
 

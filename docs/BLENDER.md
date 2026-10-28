@@ -61,13 +61,64 @@ bone twists on its own. Each bone stretches to the tracked bone length; thicknes
 scale. Bones are flattened under one root so stretching never shears children. The forearm is aimed
 by `ForearmFollower` and grows until it leaves the screen.
 
+## Marker empties
+
+`npm run assets` prunes unused data but keeps empty leaf nodes, so Blender empties arrive as named
+nodes: light positions, tool tips, stitch points. Compression (quantisation) rewrites the transforms
+of *mesh* nodes, so anything code turns or reads as a pivot (a jaw's hinge) is an empty with its mesh
+as a child.
+
 ## Theatre room contract (`theatre-room.glb`)
 
-Built by `scripts/blender/build_theatre_room.py`; pinned by `src/lib/assets/theatreRoom.test.ts`.
+Built by `scripts/blender/build_theatre_room.py`, then lit by `bake_theatre_room.py` (Cycles on the
+GPU, ~6 min at 4096 px):
+
+```bash
+blender -b --factory-startup --python scripts/blender/build_theatre_room.py
+blender -b assets/blender/theatre-room.blend --python scripts/blender/bake_theatre_room.py
+npm run assets -- theatre-room
+```
+
+The bake adds lights only for the bake (an area light under every LED panel, a spot in each lamp head),
+stand-ins whose shadows land on the floor (table, patient, tray), joins the static room into
+`Room_Baked` with lightmap UVs, bakes diffuse light, exposes it ×0.1 with a soft shoulder into an sRGB
+texture, and renders a 360° HDR from the table to `public/env/theatre-room.hdr` (used at ×0.1 too).
+Pinned by `src/lib/assets/theatreRoom.test.ts`.
 
 - A 7 × 7 m room, 3 m ceiling, centred on the operating table (three.js x −0.1, z −0.4); the viewer
   faces the front wall (−z), where the sliding doors are. Floor top at y 0.
-- One mesh per material, named `Room_<Material>` (`Room_Floor`, `Room_Wall`, `Room_LedPanel`, …).
-  `src/scenes/theatre/Room.tsx` draws it as exported; only the floor meshes receive shadows.
+- `Room_Baked` is drawn unlit (`MeshBasicMaterial`, no tone mapping); a shadow-only sheet over the floor
+  takes the live shadows. The glowing parts (`Room_LedPanel`, `Room_LampLED`, `Room_VitalsScreen`,
+  `Room_ControlLight`), `Room_DoorGlass` and `Room_Painting` stay separate and lit live.
+- `LIGHT_Surgical_A`/`_B` and their `_TARGET`s: where the twin surgical lights hang and aim. The code
+  puts its live spotlights there.
 - Visual only: the ground collider is in code. The painting on the front wall, right of the doors (`Room_Painting`), is
   textured from `assets/textures/painting.jpg`, packed into the `.blend` and exported as WebP.
+
+## Patient contract (`patient.glb`)
+
+Built by `scripts/blender/build_patient.py`. The patient lies along x (head at −x), midline z −0.4.
+`skin_height()` there and `skinHeight()` in `src/scenes/theatre/layout.ts` are the same function.
+
+- `Skin`, `Fascia`: shape keys `Open_0` … `Open_6` open the incision section by section along the guide
+  (x −0.08 … 0.08); they are tents that sum to the whole cut, so code sets each to how much of its
+  stretch has been cut. `Retracted` pulls the wound wide on top of a full open. Nothing opens outside
+  the guide.
+- `Bowel_Proximal`, `Bowel_Distal`: `Approximate` slides their cut ends together at x 0.
+  `Bowel_Necrotic` is the dead segment, moved by code (into the forceps, into the dish).
+- `Clamp_Proximal`/`_Distal`, `Guide_Incision`, `Guide_CutRings`, `Guide_Stitches`, `Guide_Staples`:
+  shown per step by code.
+- Empties: `INCISION_From`/`To`, `CUT_Proximal`/`Distal`, `STITCH_01` … `08` (in order), `STAPLE_01` … `10`.
+- Visual only: the body's colliders are boxes in `Patient.tsx`, rebuilt as the wound opens.
+
+## Instruments contract (`instruments.glb`)
+
+Built by `scripts/blender/build_instruments.py`. Each tool (`Scalpel`, `Forceps`, `Scissors`,
+`NeedleDriver`, `Stapler`, `Balfour`) is a root node where it rests on the Mayo tray; in its frame the
+tip points along −z and the top is +y, the origin is where it's held.
+
+- Hinges (empties): `Forceps_JAW_L`/`R`, `Scissors_JAW_L`/`R`, `NeedleDriver_JAW_L`/`R` turn about y;
+  `Stapler_TRIGGER` about x.
+- Working points (empties): `Scalpel_EDGE`, `Forceps_TIP`, `Scissors_TIP`, `NeedleDriver_TIP` (the
+  needle's point), `Stapler_TIP`, `Balfour_SEAT`.
+- `MayoTray` and `KidneyDish` are fixtures. Colliders are boxes in `src/scenes/theatre/Tools.tsx`.
