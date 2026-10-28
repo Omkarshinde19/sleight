@@ -63,7 +63,7 @@ function settle(hand: Handedness, raw: PoseSnapshot, tMs: number, scale: number)
 export const handPose = {
   active: false,
   /** Robot hand size relative to the real hand (the workspace's handScale). */
-  handScale: 1.5,
+  handScale: 0.94,
 
   push(hands: Partial<Record<Handedness, TrackedHand>>, tMs: number) {
     this.active = true;

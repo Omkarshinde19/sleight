@@ -88,7 +88,8 @@ test("a fist can't pick up the microchip, a pinch can", async ({ page }) => {
   await setup(page);
   const off = await pinchOffset(page);
   const c = await chip(page);
-  await reach(page, { x: c.x - off.x, y: c.y + 0.01 - off.y, z: c.z - off.z });
+  // 3 cm above: inside the chip's grab reach (5.5 cm), clear of the curling fingertips, which would flick it off the bench
+  await reach(page, { x: c.x - off.x, y: c.y + 0.03 - off.y, z: c.z - off.z });
   await page.waitForTimeout(500);
   await gesture(page, "fist");
   await page.waitForTimeout(500);

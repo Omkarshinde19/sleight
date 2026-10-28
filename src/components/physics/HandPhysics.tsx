@@ -192,7 +192,7 @@ function palmQuaternion(J: Point[], out: THREE.Quaternion) {
  * gesture near a registered grabbable joins it to the hand's anchor body with a joint (never by
  * teleporting it); releasing removes the joint and hands over the hand's recent velocity.
  */
-export function HandPhysics({ scale = 1.5, children }: { scale?: number; children?: ReactNode }) {
+export function HandPhysics({ scale = 0.94, children }: { scale?: number; children?: ReactNode }) {
   const registry = useMemo<Registry>(() => new Map(), []);
   const hands = useRef<Record<Handedness, HandRuntime>>({ Right: newRuntime(), Left: newRuntime() });
   const seenSwaps = useRef(handStore.getState().labelSwaps);

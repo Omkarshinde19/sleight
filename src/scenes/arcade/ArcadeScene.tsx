@@ -18,7 +18,7 @@ const WORKSPACE: Workspace = {
   height: 1.15,
   depthGain: 1.4,
   depthRange: 0.6,
-  handScale: 1.5,
+  handScale: 0.94, // was 1.5: hands 1.6× smaller
 };
 
 function onSensor({ other }: IntersectionEnterPayload) {

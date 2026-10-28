@@ -17,7 +17,7 @@ const WORKSPACE: Workspace = {
   height: 0.8,
   depthGain: 1.0,
   depthRange: 0.4,
-  handScale: 1.2,
+  handScale: 0.75, // was 1.2: hands 1.6× smaller
 };
 
 if (typeof window !== "undefined") Object.assign(window, { __theatre: useTheatre, __tools: { tools, point: (n: Parameters<typeof toolPoint>[0]) => toolPoint(n).toArray(), anatomy } });

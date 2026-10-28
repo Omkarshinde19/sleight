@@ -18,7 +18,7 @@ const WORKSPACE: Workspace = {
   height: 0.9,
   depthGain: 1.1,
   depthRange: 0.45,
-  handScale: 1.4,
+  handScale: 0.875, // was 1.4: hands 1.6× smaller
 };
 
 if (typeof window !== "undefined") Object.assign(window, { __industrial: useIndustrial });
