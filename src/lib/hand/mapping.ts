@@ -20,7 +20,7 @@ export const DEFAULT_WORKSPACE: Workspace = {
   height: 1.2,
   depthGain: 1.6,
   depthRange: 0.7,
-  handScale: 1.5,
+  handScale: 0.94,
 };
 
 /** Palm centre in image space: between the wrist and the middle-finger knuckle. */

@@ -5,7 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { ForearmFollower, SCENE_ELBOW, type ElbowPlacement } from "@/lib/hand/forearm";
 import { HandRig } from "@/lib/hand/rig";
 import { BONES, LM, type Handedness } from "@/lib/hand/types";
 import { weatherproof } from "@/lib/materials/chrome";
@@ -15,29 +14,14 @@ import { handStore } from "@/state/handStore";
 /*
  * The chrome robot hand, modelled and rigged in Blender (scripts/blender/build_hand.py), driven every
  * frame from the tracked joints by HandRig. One skinned mesh per material, so about four draw calls a
- * hand. The forearm hangs toward an elbow that follows the hand (ForearmFollower).
+ * hand. The hands end at the wrist: a short cuff carries on in line with the hand (no forearm).
  */
 
 const MODEL_URL = "/models/robot-hand.glb";
-/** Real-hand forearm length (m) before the hand scale and the `forearm` multiplier. */
-const FOREARM_LENGTH = 0.27;
-/** When the forearm reaches off-screen, it grows at most to this multiple of its length. */
-const MAX_REACH = 2.5;
+/** Real-hand length (m) of the wrist cuff, the FOREARM bone (scripts/blender/build_hand.py). */
+const CUFF_LENGTH = 0.05;
 
-const vNdc = new THREE.Vector3();
-const vWrist = new THREE.Vector3();
 const vDir = new THREE.Vector3();
-
-/** Shortest length (≥ base) at which the forearm's far end is out of the camera's view; capped. */
-function offscreenLength(wrist: THREE.Vector3, dir: THREE.Vector3, camera: THREE.Camera, base: number) {
-  const step = base * 0.1;
-  for (let len = base; len < base * MAX_REACH; len += step) {
-    vNdc.copy(wrist).addScaledVector(dir, len).project(camera);
-    // a little past the edge, so the forearm's widest part is gone too
-    if (Math.abs(vNdc.x) > 1.15 || Math.abs(vNdc.y) > 1.15 || vNdc.z > 1) return len;
-  }
-  return base * MAX_REACH;
-}
 
 /** The Blender materials, once: rain and snow on the chrome, and the reflections the scenes are lit for. */
 const prepared = new WeakSet<THREE.Material>();
@@ -65,25 +49,9 @@ function updateGhost(ghost: THREE.LineSegments, pose: HandPoseSample | null) {
   gp.needsUpdate = true;
 }
 
-export function RobotHand({
-  hand,
-  scale = 1.5,
-  forearm = 1,
-  elbowAt = SCENE_ELBOW,
-  reachOffscreen = true,
-}: {
-  hand: Handedness;
-  scale?: number;
-  /** Forearm length multiplier (shorter on the landing page so it stays clear of the headline). */
-  forearm?: number;
-  /** Where the elbow sits (the forearm hangs toward it). */
-  elbowAt?: ElbowPlacement;
-  /** Grow the forearm until its end is off-screen, so it never shows as a stump. */
-  reachOffscreen?: boolean;
-}) {
+export function RobotHand({ hand, scale = 0.94 }: { hand: Handedness; scale?: number }) {
   const group = useRef<THREE.Group>(null);
   const { scene } = useGLTF(MODEL_URL);
-  const follower = useMemo(() => new ForearmFollower(elbowAt), [elbowAt]);
 
   const { rig, ghost } = useMemo(() => {
     const rig = new HandRig(clone(scene));
@@ -108,25 +76,20 @@ export function RobotHand({
     [ghost],
   );
 
-  useFrame(({ camera }, delta) => {
+  useFrame(() => {
     const h = handStore.getState().hands[hand];
     if (!group.current) return;
     group.current.visible = !!h;
-    if (!h) {
-      follower.reset();
-      return;
-    }
+    if (!h) return;
     // the interpolated pose (smooth at any frame rate, and exactly where the physics colliders are)
     const pose = handPose.sample(hand);
     const joints = (pose ?? h).joints;
     updateGhost(ghost, pose);
-
+    // the cuff carries on straight back from the knuckles through the wrist
     const w = joints[LM.WRIST];
-    const wrist = vWrist.set(w.x, w.y, w.z);
-    const dir = vDir.copy(follower.update(w, joints[LM.MIDDLE_MCP], delta, scale));
-    const base = FOREARM_LENGTH * scale * forearm;
-    const length = reachOffscreen ? offscreenLength(wrist, dir, camera, base) : base;
-    rig.update(joints, hand, dir, length, scale);
+    const m = joints[LM.MIDDLE_MCP];
+    const dir = vDir.set(w.x - m.x, w.y - m.y, w.z - m.z).normalize();
+    rig.update(joints, hand, dir, CUFF_LENGTH * scale, scale);
   });
 
   return (

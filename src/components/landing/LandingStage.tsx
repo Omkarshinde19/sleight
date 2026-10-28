@@ -4,7 +4,6 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RobotHand } from "@/components/hands/RobotHand";
-import { LANDING_ELBOW } from "@/lib/hand/forearm";
 import { Studio } from "@/components/scene/Studio";
 import { Weather } from "@/components/weather/Weather";
 import { handFeatures } from "@/lib/hand/gestures";
@@ -17,7 +16,7 @@ import { handStore } from "@/state/handStore";
 import { callouts } from "./callouts";
 import { scroll } from "./scroll";
 
-const HAND_SCALE = 2.3;
+const HAND_SCALE = 1.44; // was 2.3: hands 1.6× smaller
 const WS: Workspace = { center: { x: 0, y: 0, z: 0 }, width: 1, height: 1, depthGain: 1, depthRange: 1, handScale: HAND_SCALE };
 
 interface Key {
@@ -201,8 +200,8 @@ export default function LandingStage() {
       <Studio intensity={1.1} />
       <Weather />
       <Suspense fallback={null}>
-        <RobotHand hand="Right" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
-        <RobotHand hand="Left" scale={HAND_SCALE} forearm={0.55} elbowAt={LANDING_ELBOW} reachOffscreen={false} />
+        <RobotHand hand="Right" scale={HAND_SCALE} />
+        <RobotHand hand="Left" scale={HAND_SCALE} />
       </Suspense>
       <Driver />
     </Canvas>
