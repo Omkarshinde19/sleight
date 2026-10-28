@@ -48,14 +48,26 @@ function Driver() {
     camera.position.set(0, 1.2, portrait ? 2.6 : 1.55);
     camera.lookAt(LOOK);
 
-    // idle: a slow float between the two lines of the headline
     const L = live.current;
-    heroToWorld(size.width * (portrait ? 0.5 : 0.56) + Math.sin(t * 0.5) * size.width * 0.03, size.height * 0.5 + Math.sin(t * 0.8) * size.height * 0.02, size, camera, target.current);
-    const pose: HandPose = { curl: POSES.open.curl.map((c, i) => c + 0.12 + 0.06 * Math.sin(t * 1.3 + i * 0.6)) as HandPose["curl"], pinch: 0 };
+    const P = hero.pointer;
+    let pose: HandPose;
+    if (P.active) {
+      // the mouse (or a finger) carries the hand; pressing closes it
+      heroToWorld(P.x, P.y, size, camera, target.current);
+      pose = hero.pressed ? POSES.fist : { curl: [0.1, 0.08, 0.1, 0.12, 0.15], pinch: 0 };
+    } else {
+      // idle: a slow float between the two lines of the headline
+      heroToWorld(size.width * (portrait ? 0.5 : 0.56) + Math.sin(t * 0.5) * size.width * 0.03, size.height * 0.5 + Math.sin(t * 0.8) * size.height * 0.02, size, camera, target.current);
+      pose = { curl: POSES.open.curl.map((c, i) => c + 0.12 + 0.06 * Math.sin(t * 1.3 + i * 0.6)) as HandPose["curl"], pinch: 0 };
+    }
 
-    L.anchor.lerp(target.current, 1 - Math.exp(-dt / 0.12));
-    L.pose = lerpPose(L.pose, pose, 1 - Math.exp(-dt / 0.1));
-    L.orientation.roll += (FACING.roll + Math.sin(t * 0.6) * 0.08 - L.orientation.roll) * 0.1;
+    const before = L.anchor.x;
+    L.anchor.lerp(target.current, 1 - Math.exp(-dt / (P.active ? 0.05 : 0.12)));
+    L.pose = lerpPose(L.pose, pose, 1 - Math.exp(-dt / 0.06));
+    // lean into sideways moves
+    const vx = (L.anchor.x - before) / Math.max(dt, 1e-3);
+    const roll = FACING.roll + Math.sin(t * 0.6) * 0.08 - THREE.MathUtils.clamp(vx * 0.35, -0.6, 0.6);
+    L.orientation.roll += (roll - L.orientation.roll) * (1 - Math.exp(-dt / 0.1));
 
     const raw = synthHand({ handedness: "Right", pose: L.pose, orientation: L.orientation, imageX: 0.5, imageY: 0.5, distance: 0.5 });
     const joints = jointsInScene(raw.worldLandmarks, L.anchor, WS);
@@ -66,6 +78,7 @@ function Driver() {
     projected.copy(grip).project(camera);
     hero.hand.x = (projected.x * 0.5 + 0.5) * size.width;
     hero.hand.y = (-projected.y * 0.5 + 0.5) * size.height;
+    hero.hand.closed = P.active && hero.pressed;
     hero.hand.visible = true;
   });
 

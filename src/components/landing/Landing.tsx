@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { archivo } from "./fonts";
 import { hero } from "./hero";
@@ -87,6 +87,13 @@ export function Landing() {
     };
   }, []);
 
+  const point = (e: PointerEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    hero.pointer.x = e.clientX - r.left;
+    hero.pointer.y = e.clientY - r.top;
+    hero.pointer.active = true;
+  };
+
   return (
     <div className={`${styles.page} ${archivo.variable}`}>
       <header className={styles.nav}>
@@ -109,7 +116,24 @@ export function Landing() {
         </Link>
       </header>
 
-      <section ref={heroRef} className={styles.hero}>
+      <section
+        ref={heroRef}
+        className={styles.hero}
+        onPointerMove={point}
+        onPointerDown={(e) => {
+          point(e);
+          hero.pressed = true;
+        }}
+        onPointerUp={() => (hero.pressed = false)}
+        onPointerCancel={() => {
+          hero.pressed = false;
+          hero.pointer.active = false;
+        }}
+        onPointerLeave={() => {
+          hero.pressed = false;
+          hero.pointer.active = false;
+        }}
+      >
         <div className={styles.blobs} aria-hidden>
           {showStage && <Blobs active={heroInView} />}
         </div>
@@ -129,6 +153,7 @@ export function Landing() {
           driven
           <br />
           by yours
+          <span className={styles.hint}>Move the mouse · press to make a fist</span>
         </p>
 
         <div className={styles.side}>
