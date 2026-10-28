@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { archivo } from "./fonts";
-import { hero } from "./hero";
+import { hero, type Room } from "./hero";
 import { useLetterGrab } from "./letters";
 import styles from "./landing.module.css";
 
@@ -18,6 +18,7 @@ const ROOMS = [
     id: "arcade",
     href: "/arcade",
     verb: "THROW",
+    moves: ["Cup", "Flick", "Open", "Score"],
     name: "Arcade Room",
     lede: "Cup a basketball with a half-closed hand, flick and open. It leaves with your hand's own velocity.",
     facts: [
@@ -32,6 +33,7 @@ const ROOMS = [
     id: "theatre",
     href: "/theatre",
     verb: "CUT",
+    moves: ["Pinch", "Cut", "Stitch", "Staple"],
     name: "Operating Theatre",
     lede: "A bowel resection in five steps: scalpel, retractor, scissors, needle driver, stapler. One instrument at a time.",
     facts: [
@@ -82,6 +84,12 @@ export function Landing() {
   const heroRef = useRef<HTMLElement>(null);
   const [showStage, setShowStage] = useState(false);
   const [heroInView, setHeroInView] = useState(true);
+  const [preview, setPreview] = useState<Room | null>(null);
+  const previewRoom = setPreview;
+  useEffect(() => {
+    hero.preview = preview;
+  }, [preview]);
+  const stack = ROOMS.find((r) => r.id === preview)?.moves ?? ["Robot", "hands", "driven", "by yours"];
   const weather = useWeather((s) => s.kind);
   const setWeather = useWeather((s) => s.setKind);
   useLetterGrab(heroRef);
@@ -163,14 +171,10 @@ export function Landing() {
           {showStage && <LandingStage active={heroInView} />}
         </div>
 
-        <p className={styles.stack}>
-          Robot
-          <br />
-          hands
-          <br />
-          driven
-          <br />
-          by yours
+        <p className={styles.stack} data-preview={preview ?? undefined}>
+          {stack.map((w) => (
+            <span key={w}>{w}</span>
+          ))}
           <span className={styles.hint}>Move the mouse · press to make a fist · grab a letter</span>
         </p>
 
@@ -178,7 +182,13 @@ export function Landing() {
           <ol className={styles.index}>
             {ROOMS.map((r) => (
               <li key={r.id}>
-                <Link href={r.href}>
+                <Link
+                  href={r.href}
+                  onPointerEnter={() => previewRoom(r.id)}
+                  onPointerLeave={() => previewRoom(null)}
+                  onFocus={() => previewRoom(r.id)}
+                  onBlur={() => previewRoom(null)}
+                >
                   <span>{r.n}</span> {r.name}
                 </Link>
               </li>
