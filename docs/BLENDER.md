@@ -60,3 +60,14 @@ from its parent's orientation and swings, by the smallest rotation, to point at 
 bone twists on its own. Each bone stretches to the tracked bone length; thickness follows the hand
 scale. Bones are flattened under one root so stretching never shears children. The forearm is aimed
 by `ForearmFollower` and grows until it leaves the screen.
+
+## Theatre room contract (`theatre-room.glb`)
+
+Built by `scripts/blender/build_theatre_room.py`; pinned by `src/lib/assets/theatreRoom.test.ts`.
+
+- A 7 × 7 m room, 3 m ceiling, centred on the operating table (three.js x −0.1, z −0.4); the viewer
+  faces the front wall (−z), where the sliding doors are. Floor top at y 0.
+- One mesh per material, named `Room_<Material>` (`Room_Floor`, `Room_Wall`, `Room_LedPanel`, …).
+  `src/scenes/theatre/Room.tsx` draws it as exported; only the floor meshes receive shadows.
+- Visual only: the ground collider is in code. The painting on the right wall (`Room_Painting`) is
+  textured from `assets/textures/painting.jpg`, packed into the `.blend` and exported as WebP.
