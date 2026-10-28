@@ -26,19 +26,17 @@ interface Key {
   visible: boolean;
 }
 
-/** Hand keyframes for each chapter: hero, thrower, machinist, surgeon, pipeline. */
+/** Hand keyframes for each chapter: hero, thrower, surgeon, pipeline. */
 const KEYS: Record<Handedness, Key[]> = {
   Right: [
     // the reach: index extended toward the other hand, palm down
     { anchor: { x: 0.66, y: 1.24, z: -0.05 }, pose: { curl: [0.25, 0.05, 0.35, 0.5, 0.6], pinch: 0 }, orientation: { roll: 1.45, pitch: -1.15, yaw: 0.25 }, visible: true },
     { anchor: { x: 0.34, y: 1.02, z: 0.05 }, pose: POSES.fist, orientation: { roll: 0.25, pitch: -0.35, yaw: 0.4 }, visible: true },
-    { anchor: { x: -0.32, y: 1.1, z: 0.1 }, pose: POSES.pinch, orientation: { roll: 0.35, pitch: -0.35, yaw: 1.15 }, visible: true },
     { anchor: { x: 0.3, y: 1.12, z: 0.1 }, pose: { curl: [0.35, 0.42, 0.55, 0.7, 0.8], pinch: 0.92 }, orientation: { roll: 0.8, pitch: -0.95, yaw: 0.2 }, visible: true },
     { anchor: { x: 1.05, y: 1.42, z: -0.4 }, pose: POSES.open, orientation: { roll: 0.5, pitch: -0.3, yaw: 0.2 }, visible: true },
   ],
   Left: [
     { anchor: { x: -0.02, y: 1.2, z: -0.05 }, pose: { curl: [0.2, 0.15, 0.3, 0.4, 0.5], pinch: 0 }, orientation: { roll: -1.5, pitch: -1.3, yaw: -0.2 }, visible: true },
-    { anchor: { x: -0.8, y: 1.1, z: -0.2 }, pose: POSES.open, orientation: { roll: -0.6, pitch: -0.6, yaw: -0.2 }, visible: false },
     { anchor: { x: -0.8, y: 1.1, z: -0.2 }, pose: POSES.open, orientation: { roll: -0.6, pitch: -0.6, yaw: -0.2 }, visible: false },
     { anchor: { x: -0.8, y: 1.1, z: -0.2 }, pose: POSES.open, orientation: { roll: -0.6, pitch: -0.6, yaw: -0.2 }, visible: false },
     { anchor: { x: -1.05, y: 1.42, z: -0.4 }, pose: POSES.open, orientation: { roll: -0.5, pitch: -0.3, yaw: -0.2 }, visible: true },
@@ -70,7 +68,6 @@ function Driver() {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
   const ball = useRef<THREE.Mesh>(null);
-  const chip = useRef<THREE.Mesh>(null);
   const scalpel = useRef<THREE.Group>(null);
   const chrome = useMemo(() => makeChromeMaterial(), []);
 
@@ -103,7 +100,7 @@ function Driver() {
       // and above the chapter cards, closer to the centre
       if (portrait) {
         anchor.x *= chapter === 0 ? 0.62 : 0.45;
-        anchor.y += chapter === 0 ? -0.62 : chapter === 4 ? 0.2 : 0.62;
+        anchor.y += chapter === 0 ? -0.62 : chapter === 3 ? 0.2 : 0.62;
       }
       L.anchor.lerp(anchor, chapter === 1 && h === "Right" ? 1 - Math.exp(-dt / 0.08) : k);
       L.pose = lerpPose(L.pose, pose, chapter === 1 && h === "Right" ? 1 - Math.exp(-dt / 0.06) : k);
@@ -137,12 +134,8 @@ function Driver() {
         ball.current.rotation.x -= dt * 6;
       }
     }
-    if (chip.current) {
-      chip.current.visible = chapter === 2 && !!R;
-      if (R) chip.current.position.copy(toV(R.grip)).add(new THREE.Vector3(0.01, -0.05, 0.02));
-    }
     if (scalpel.current) {
-      scalpel.current.visible = chapter === 3 && !!R;
+      scalpel.current.visible = chapter === 2 && !!R;
       if (R) {
         scalpel.current.position.copy(toV(R.grip));
         const dir = toV(R.joints[LM.INDEX_TIP]).sub(toV(R.joints[LM.INDEX_MCP])).normalize();
@@ -152,7 +145,7 @@ function Driver() {
 
     // blueprint callouts on the right hand
     const root = callouts.root;
-    if (root) root.style.opacity = chapter === 4 || !R ? "0" : "1";
+    if (root) root.style.opacity = chapter === 3 || !R ? "0" : "1";
     if (root && R) {
       const items: [Point, string][] = [
         [R.joints[LM.INDEX_PIP], `INDEX PIP ${flexionDeg(R.joints[LM.INDEX_MCP], R.joints[LM.INDEX_PIP], R.joints[LM.INDEX_DIP]).toFixed(0)}°`],
@@ -177,10 +170,6 @@ function Driver() {
       <mesh ref={ball} visible={false}>
         <sphereGeometry args={[0.085, 40, 24]} />
         <meshPhysicalMaterial color="#e2553a" roughness={0.55} clearcoat={0.3} />
-      </mesh>
-      <mesh ref={chip} visible={false} rotation={[1.1, 0.35, 0.15]}>
-        <boxGeometry args={[0.09, 0.014, 0.09]} />
-        <meshPhysicalMaterial color="#14151b" roughness={0.3} clearcoat={0.8} />
       </mesh>
       <group ref={scalpel} visible={false}>
         <mesh material={chrome} position={[0, 0, 0.09]}>

@@ -5,7 +5,7 @@ type W = { __sleight: { three: { camera: { fov: number; rotation: { x: number; y
 const view = (page: Page) => page.evaluate(() => { const c = (window as unknown as W).__sleight.three.camera; return { pitch: c.rotation.x, yaw: c.rotation.y, fov: c.fov }; });
 const palm = (page: Page) => page.evaluate(() => { const p = (window as unknown as W).__sleight.store.getState().hands.Right.palm; return { x: p.x, y: p.y }; });
 
-for (const scene of ["/theatre", "/arcade", "/industrial"]) {
+for (const scene of ["/theatre", "/arcade"]) {
   test(`${scene}: right-drag looks around, the wheel zooms, reset puts it back`, async ({ page }) => {
     await openWithSim(page, scene);
     await page.waitForFunction(() => !!(window as unknown as W).__sleight?.three?.camera);

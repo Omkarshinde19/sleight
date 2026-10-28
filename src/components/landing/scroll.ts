@@ -1,8 +1,8 @@
 /** Scroll progress shared between the page and the 3D stage, outside React. */
 export const scroll = { progress: 0, chapter: 0, local: 0 };
 
-/** Section boundaries as page-progress fractions: hero, thrower, machinist, surgeon, pipeline. */
-export const CHAPTERS = [0, 0.16, 0.38, 0.6, 0.82, 1];
+/** Section boundaries as page-progress fractions: hero, thrower, surgeon, pipeline. */
+export const CHAPTERS = [0, 0.2, 0.47, 0.74, 1];
 
 export function updateScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;

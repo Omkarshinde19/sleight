@@ -25,18 +25,6 @@ const CHAPTERS = [
   },
   {
     n: "02",
-    href: "/industrial",
-    name: "The Machinist",
-    scene: "Industrial Floor",
-    lede: "A precise pinch lifts a 5 cm microchip into its socket. A full fist hauls heavy levers that pull back.",
-    facts: [
-      ["Seating", "within 3 cm and 14° of the socket, read live as Δxy / Δθ"],
-      ["Levers", "revolute joints with a spring–damper motor; the hand holds the knob through a spring"],
-      ["Machine", "throttle runs the line, the press stamps each blank"],
-    ],
-  },
-  {
-    n: "03",
     href: "/theatre",
     name: "The Surgeon",
     scene: "Operating Theatre",
@@ -103,7 +91,6 @@ export function Landing() {
         <span className={styles.wordmark}>Sleight</span>
         <nav className={`${styles.navLinks} glass`}>
           <Link href="/arcade">Arcade</Link>
-          <Link href="/industrial">Industrial</Link>
           <Link href="/theatre">Theatre</Link>
           <a href="https://github.com/Omkarshinde19/sleight" rel="noreferrer">GitHub</a>
         </nav>
@@ -118,8 +105,7 @@ export function Landing() {
             <em>in chrome.</em>
           </h1>
           <p className={styles.heroLede}>
-            Your webcam tracks your hand and three robot hands move with it, through an arcade, a factory floor and an operating
-            theatre. Real physics, real grips, nothing sent anywhere.
+            Your webcam tracks your hand and robot hands move with it, through an arcade and an operating theatre. Real physics, real grips, nothing sent anywhere.
           </p>
           <div className={styles.heroActions}>
             <Link href="/arcade" className={styles.primary}>Start with the Arcade</Link>
