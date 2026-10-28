@@ -157,6 +157,11 @@
   pointer-events: none;
 }
 
+.letter {
+  display: inline-block;
+  will-change: transform;
+}
+
 .stage {
   position: absolute;
   inset: 0;

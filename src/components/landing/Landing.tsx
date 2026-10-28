@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { archivo } from "./fonts";
 import { hero } from "./hero";
+import { useLetterGrab } from "./letters";
 import styles from "./landing.module.css";
 
 const LandingStage = dynamic(() => import("./LandingStage"), { ssr: false });
@@ -63,6 +64,18 @@ const WEATHER: { kind: WeatherKind; label: string }[] = [
   { kind: "snow", label: "Snow" },
 ];
 
+/** One span per letter, so the hand can pick them up (see letters.ts). */
+const spell = (word: string) =>
+  [...word].map((ch, i) =>
+    ch === " " ? (
+      " "
+    ) : (
+      <span key={i} data-letter className={styles.letter}>
+        {ch}
+      </span>
+    ),
+  );
+
 const TICKER = ["Real hands", "Real physics", "Nothing uploaded", "Runs in your tab", "Two rooms", "One hand"];
 
 export function Landing() {
@@ -71,6 +84,7 @@ export function Landing() {
   const [heroInView, setHeroInView] = useState(true);
   const weather = useWeather((s) => s.kind);
   const setWeather = useWeather((s) => s.setKind);
+  useLetterGrab(heroRef);
 
   useEffect(() => {
     // Let the type paint first, then bring in the 3D.
@@ -137,9 +151,13 @@ export function Landing() {
         <div className={styles.blobs} aria-hidden>
           {showStage && <Blobs active={heroInView} />}
         </div>
-        <h1 className={styles.headline}>
-          <span className={styles.lineTop}>Sleight</span>
-          <span className={styles.lineBottom}>of hand</span>
+        <h1 className={styles.headline} aria-label="Sleight of hand">
+          <span className={styles.lineTop} aria-hidden>
+            {spell("Sleight")}
+          </span>
+          <span className={styles.lineBottom} aria-hidden>
+            {spell("of hand")}
+          </span>
         </h1>
         <div className={styles.stage} aria-hidden>
           {showStage && <LandingStage active={heroInView} />}
@@ -153,7 +171,7 @@ export function Landing() {
           driven
           <br />
           by yours
-          <span className={styles.hint}>Move the mouse · press to make a fist</span>
+          <span className={styles.hint}>Move the mouse · press to make a fist · grab a letter</span>
         </p>
 
         <div className={styles.side}>
