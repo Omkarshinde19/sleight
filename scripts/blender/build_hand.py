@@ -4,12 +4,12 @@
 
 The look follows the procedural ChromeHand: muscle-profile phalanges with gunmetal armour plates and
 hinge knuckles, a thick palm with thenar/hypothenar pads, copper tendon cables over the back of the hand,
-and a muscled forearm with bundles, veins, hoses and a wrist collar.
+and a short wrist cuff (no forearm: the hands end at the wrist).
 
 Contract with the code (see docs/BLENDER.md):
 - Armature "RobotHand" with 21 bones named after MediaPipe's landmarks plus FOREARM. Bone X starts at
-  landmark X and points at the next landmark down the chain; the *_TIP bones are 12 mm nubs. FOREARM runs
-  elbow -> wrist and parents WRIST; every finger root (THUMB_CMC, *_MCP) is a child of WRIST.
+  landmark X and points at the next landmark down the chain; the *_TIP bones are 12 mm nubs. FOREARM (the 5 cm
+  wrist cuff) runs back from the wrist and parents WRIST; every finger root (THUMB_CMC, *_MCP) is a child of WRIST.
 - Rest pose: open right hand, wrist at the origin, fingers up, back of the hand toward the viewer
   (three.js: fingers +Y, palm facing -Z, thumb on -X), the same frame the tracker uses in the scene.
 - Bone axes: local +Y along the bone, local +Z toward the back of the hand (the thumbnail for the thumb).
@@ -76,7 +76,7 @@ DORSAL = Vector((0, -1, 0))  # back of the hand, toward the viewer
 PALMAR = -DORSAL
 THUMB_NAIL = Vector((-0.8, -0.6, 0)).normalized()
 ACROSS = J[INDEX_MCP] - J[PINKY_MCP]  # unnormalised on purpose: offsets below are fractions of it
-FOREARM_LENGTH = 0.27
+FOREARM_LENGTH = 0.05  # a wrist cuff, not an arm
 FOREARM_RADIUS = 0.024
 ARM_DIR = (J[WRIST] - J[MIDDLE_MCP]).normalized()
 ELBOW = J[WRIST] + ARM_DIR * FOREARM_LENGTH
@@ -320,44 +320,18 @@ def build_palm(b):
     b.sweep(hm, circle(18), [(-fr * 0.95, fr * 0.7, fr * 0.7), (fr * 0.95, fr * 0.7, fr * 0.7)], "WRIST", "Gunmetal")
 
 
-def forearm_profile(t):
-    """Radius along the forearm (0 = wrist, 1 = elbow): slim wrist, muscle belly two thirds up."""
-    return 1 + 0.62 * math.exp(-(((t - 0.62) / 0.28) ** 2)) + 0.18 * t
-
-
-def build_forearm(b):
+def build_wrist_cuff(b):
+    """A short cuff behind the wrist instead of an arm: a chrome sleeve, a gunmetal collar at the wrist
+    and a gunmetal end cap, so the hand ends cleanly."""
     w = J[WRIST]
     fr = FOREARM_RADIUS
     m, length = frame_between(w, ELBOW, DORSAL)
-    rings = profile(lambda t: (t * length, fr * forearm_profile(t), fr * 0.86 * forearm_profile(t)), 20)
+    rings = profile(lambda t: (t * length, fr * (1 + 0.12 * t), fr * 0.86 * (1 + 0.12 * t)), 6)
     b.sweep(m, circle(28), rings, "FOREARM", "Chrome")
-
-    side = ARM_DIR.cross(DORSAL).normalized()
-    # flexor / extensor bundles bulging out of the forearm
-    for direction, at in ((DORSAL, 0.6), (side, 0.55), (-side, 0.5), (PALMAR, 0.62)):
-        a = w.lerp(ELBOW, at - 0.32) + direction * fr * 0.95
-        c = w.lerp(ELBOW, at + 0.3) + direction * fr * 1.25
-        ellipsoid(b, a, c, direction, fr * 0.55, fr * 0.42, "FOREARM", "Muscle", seg=14, steps=8)
-
-    # veins: copper cables riding the muscle contour, wandering a little
-    for v, k in enumerate((-0.6, 0.05, 0.62)):
-        pts = []
-        for i in range(16):
-            t = 0.04 + 0.88 * i / 15
-            ang = k + math.sin(t * 5 + v * 2) * 0.12
-            direction = (DORSAL * math.cos(ang) + side * math.sin(ang)).normalized()
-            r_scale = math.hypot(math.cos(ang) * 0.86, math.sin(ang))
-            pts.append(w.lerp(ELBOW, t) + direction * fr * (forearm_profile(t) * r_scale + 0.1))
-        b.tube(pts, 0.0033, "FOREARM", "Copper")
-
-    # hydraulic hoses on the inner forearm
-    for k in (0.35, -0.35):
-        direction = (PALMAR * math.cos(k) + side * math.sin(k)).normalized()
-        b.tube([w + direction * fr * 1.05, ELBOW + direction * fr * 1.3], 0.0052, "FOREARM", "Gunmetal", sides=10)
-
-    # wrist collar
     cm, _ = frame_between(w + ARM_DIR * 0.006, ELBOW, DORSAL)
     b.torus(cm, fr * 1.08, fr * 1.08 * 0.22, "FOREARM", "Gunmetal")
+    em, _ = frame_between(ELBOW - ARM_DIR * 0.004, ELBOW + ARM_DIR, DORSAL)
+    b.sweep(em, circle(28), [(0, fr * 1.16, fr * 1.0), (0.006, fr * 1.16, fr * 1.0), (0.0065, fr * 0.6, fr * 0.52), (0.007, 0.0005, 0.0005)], "FOREARM", "Gunmetal")
 
 
 # ---------- materials ----------
@@ -437,7 +411,7 @@ def main():
     b = Builder()
     build_fingers(b)
     build_palm(b)
-    build_forearm(b)
+    build_wrist_cuff(b)
     me = b.to_mesh("RobotHandMesh")
     mats = {
         "Chrome": make_material("Chrome", srgb("#eef1f7"), 0.09, 0.9),

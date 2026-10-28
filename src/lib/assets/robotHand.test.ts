@@ -41,7 +41,7 @@ describe("robot hand model", () => {
     expect(at("MIDDLE_FINGER_TIP").y).toBeGreaterThan(0.17);
     expect(at("THUMB_TIP").x).toBeLessThan(at("INDEX_FINGER_TIP").x);
     expect(at("PINKY_MCP").x).toBeGreaterThan(at("INDEX_FINGER_MCP").x);
-    expect(at("FOREARM").y).toBeCloseTo(-0.27, 2);
+    expect(at("FOREARM").y).toBeCloseTo(-0.05, 2); // a 5 cm wrist cuff, no forearm
 
     // each bone's local +Y points at its child landmark; local +Z leans to the back of the hand
     const pip = scene.getObjectByName("INDEX_FINGER_PIP")!;
