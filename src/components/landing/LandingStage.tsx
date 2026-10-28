@@ -12,6 +12,7 @@ import { lerpPose, POSES, synthHand, type HandPose, type Orientation } from "@/l
 import { LM } from "@/lib/hand/types";
 import type { TrackedHand } from "@/lib/tracking/processor";
 import { handStore } from "@/state/handStore";
+import { Halftone } from "./Halftone";
 import { hero } from "./hero";
 
 const HAND_SCALE = 1.44;
@@ -80,6 +81,7 @@ export default function LandingStage() {
         <RobotHand hand="Right" scale={HAND_SCALE} />
       </Suspense>
       <Driver />
+      <Halftone />
     </Canvas>
   );
 }
