@@ -69,5 +69,5 @@ Built by `scripts/blender/build_theatre_room.py`; pinned by `src/lib/assets/thea
   faces the front wall (−z), where the sliding doors are. Floor top at y 0.
 - One mesh per material, named `Room_<Material>` (`Room_Floor`, `Room_Wall`, `Room_LedPanel`, …).
   `src/scenes/theatre/Room.tsx` draws it as exported; only the floor meshes receive shadows.
-- Visual only: the ground collider is in code. The painting on the right wall (`Room_Painting`) is
+- Visual only: the ground collider is in code. The painting on the front wall, right of the doors (`Room_Painting`), is
   textured from `assets/textures/painting.jpg`, packed into the `.blend` and exported as WebP.

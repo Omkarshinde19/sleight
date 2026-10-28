@@ -4,7 +4,7 @@
 
 A 7 x 7 m room with a 3 m ceiling, centred on the operating table, after a hybrid operating room:
 blue-violet wall panels on dark seams, a skirting, sliding double doors straight ahead, a recessed wall
-monitor and a control panel on the front wall, the horse painting on the right wall, a warm
+monitor, a control panel and the horse painting on the front wall, a warm
 grey floor with a pale blue round inlay under the table, and a white ceiling with LED light panels.
 
 Contract with the code (see docs/BLENDER.md):
@@ -39,8 +39,8 @@ PANEL_TOP = 2.9
 
 DOOR = {"u": (2.0, 4.0), "height": 2.2, "header": 0.12}  # front wall, panel columns 2-3
 MONITOR = {"u": 1.0, "z": 1.55, "size": (1.3, 0.75)}  # front wall, centre of columns 0-1
-CONTROL = {"u": 5.5, "z": 1.3, "size": (0.4, 0.5)}  # front wall, column 5
-PAINTING = {"u": 3.5, "z": 1.6, "size": (1.8, 1.2), "depth": 0.04}  # right wall, a wrapped canvas
+CONTROL = {"u": 4.5, "z": 1.3, "size": (0.4, 0.5)}  # front wall, beside the doors
+PAINTING = {"u": 6.0, "z": 1.6, "size": (1.8, 1.2), "depth": 0.04}  # front wall right of the doors, a wrapped canvas
 PAINTING_IMAGE = os.path.join(ROOT, "assets/textures/painting.jpg")
 INLAY = {"radius": 2.2, "ring": 0.06}
 
@@ -209,15 +209,15 @@ def ceiling():
 
 
 def painting():
-    """The horse painting on the right wall: a canvas box with the picture on a UV-mapped front face."""
+    """The horse painting on the front wall: a canvas box with the picture on a UV-mapped front face."""
     w, h = PAINTING["size"]
     u, z, depth = PAINTING["u"], PAINTING["z"], PAINTING["depth"]
-    RIGHT.box("CanvasEdge", u - w / 2, u + w / 2, PANEL_DEPTH, PANEL_DEPTH + depth, z - h / 2, z + h / 2)
+    FRONT.box("CanvasEdge", u - w / 2, u + w / 2, PANEL_DEPTH, PANEL_DEPTH + depth, z - h / 2, z + h / 2)
     bm = meshes["Painting"]
     uv = bm.loops.layers.uv.new("UVMap")
     d = PANEL_DEPTH + depth + 0.001
     corners = [(u - w / 2, z - h / 2, (0, 0)), (u + w / 2, z - h / 2, (1, 0)), (u + w / 2, z + h / 2, (1, 1)), (u - w / 2, z + h / 2, (0, 1))]
-    verts = [bm.verts.new((*RIGHT.point(cu, d), cz)) for cu, cz, _ in corners]
+    verts = [bm.verts.new((*FRONT.point(cu, d), cz)) for cu, cz, _ in corners]
     face = bm.faces.new(verts)  # u runs left to right as seen from inside the room, so it faces in
     for loop, (_, _, st) in zip(face.loops, corners):
         loop[uv].uv = st
