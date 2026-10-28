@@ -1,3 +1,24 @@
+import type { Workspace } from "@/lib/hand/mapping";
+
+/** Where the hero hand moves: the plane z = 0 through the stage camera's target, the hero's full height. */
+export const LANDING_WORKSPACE: Workspace = {
+  center: { x: 0, y: 1.13, z: 0 },
+  width: 2.1, // see landingWorkspace
+  height: 1.19,
+  depthGain: 0.6,
+  depthRange: 0.35,
+  handScale: 1.44,
+};
+
+/** Stage camera distance from the hand's plane (LandingStage): further back on portrait screens. */
+export const cameraDistance = (width: number, height: number) => (width < height ? 2.6 : 1.55);
+
+/** The landing workspace for a window: the stage camera's whole view of the hand's plane (fov 42°). */
+export function landingWorkspace(width: number, height: number): Workspace {
+  const h = 2 * cameraDistance(width, height) * Math.tan((21 * Math.PI) / 180);
+  return { ...LANDING_WORKSPACE, height: h, width: h * (width / height) };
+}
+
 /** Hero state shared between the page and the 3D stage, outside React (read and written every frame). */
 export type Room = "arcade" | "theatre";
 

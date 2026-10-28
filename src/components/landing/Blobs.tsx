@@ -111,7 +111,7 @@ function Field() {
       const [hx, hy, r] = HOMES[i];
       // home drifts on a slow loop of its own
       const tx = hx * size.width + Math.sin(t * 0.23 + i * 1.7) * R * 0.05;
-      const ty = (portrait ? 0.34 + hy * 0.3 : hy) * H + Math.cos(t * 0.19 + i * 2.3) * R * 0.04;
+      const ty = (portrait ? 0.32 + hy * 0.26 : hy) * H + Math.cos(t * 0.19 + i * 2.3) * R * 0.04;
       if (Number.isNaN(b.pos.x)) b.pos.set(tx, ty);
       let ax = (tx - b.pos.x) * SPRING;
       let ay = (ty - b.pos.y) * SPRING;

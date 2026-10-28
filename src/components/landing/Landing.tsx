@@ -3,9 +3,12 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { HandTrackingProvider } from "@/components/tracking/HandTrackingProvider";
+import type { Workspace } from "@/lib/hand/mapping";
 import { useWeather, type WeatherKind } from "@/state/weatherStore";
 import { archivo } from "./fonts";
-import { hero, type Room } from "./hero";
+import { HeroCamera } from "./HeroCamera";
+import { hero, LANDING_WORKSPACE, landingWorkspace, type Room } from "./hero";
 import { useLetterGrab } from "./letters";
 import styles from "./landing.module.css";
 
@@ -89,6 +92,8 @@ export function Landing() {
   useEffect(() => {
     hero.preview = preview;
   }, [preview]);
+  // the camera maps the whole hero onto the plane the hand moves on
+  const [workspace] = useState<Workspace>(() => (typeof window === "undefined" ? LANDING_WORKSPACE : landingWorkspace(window.innerWidth, window.innerHeight)));
   const stack = ROOMS.find((r) => r.id === preview)?.moves ?? ["Robot", "hands", "driven", "by yours"];
   const weather = useWeather((s) => s.kind);
   const setWeather = useWeather((s) => s.setKind);
@@ -117,209 +122,212 @@ export function Landing() {
   };
 
   return (
-    <div className={`${styles.page} ${archivo.variable}`}>
-      <header className={styles.nav}>
-        <Link href="/" className={styles.wordmark}>
-          <span className={styles.burger} aria-hidden>
-            <i />
-            <i />
-            <i />
-          </span>
-          Sleight
-        </Link>
-        <nav className={styles.navLinks}>
-          <Link href="/arcade">Arcade</Link>
-          <Link href="/theatre">Theatre</Link>
-          <a href="#venue">How it works</a>
-          <a href="https://github.com/Omkarshinde19/sleight" rel="noreferrer">GitHub</a>
-        </nav>
-        <Link href="/arcade" className={styles.pill}>
-          Enter
-        </Link>
-      </header>
-
-      <section
-        ref={heroRef}
-        className={styles.hero}
-        onPointerMove={point}
-        onPointerDown={(e) => {
-          point(e);
-          hero.pressed = true;
-        }}
-        onPointerUp={() => (hero.pressed = false)}
-        onPointerCancel={() => {
-          hero.pressed = false;
-          hero.pointer.active = false;
-        }}
-        onPointerLeave={() => {
-          hero.pressed = false;
-          hero.pointer.active = false;
-        }}
-      >
-        <div className={styles.blobs} aria-hidden>
-          {showStage && <Blobs active={heroInView} />}
-        </div>
-        <h1 className={styles.headline} aria-label="Sleight of hand">
-          <span className={styles.lineTop} aria-hidden>
-            {spell("Sleight")}
-          </span>
-          <span className={styles.lineBottom} aria-hidden>
-            {spell("of hand")}
-          </span>
-        </h1>
-        <div className={styles.stage} aria-hidden>
-          {showStage && <LandingStage active={heroInView} />}
-        </div>
-
-        <p className={styles.stack} data-preview={preview ?? undefined}>
-          {stack.map((w) => (
-            <span key={w}>{w}</span>
-          ))}
-          <span className={styles.hint}>Move the mouse · press to make a fist · grab a letter</span>
-        </p>
-
-        <div className={styles.side}>
-          <ol className={styles.index}>
-            {ROOMS.map((r) => (
-              <li key={r.id}>
-                <Link
-                  href={r.href}
-                  onPointerEnter={() => previewRoom(r.id)}
-                  onPointerLeave={() => previewRoom(null)}
-                  onFocus={() => previewRoom(r.id)}
-                  onBlur={() => previewRoom(null)}
-                >
-                  <span>{r.n}</span> {r.name}
-                </Link>
-              </li>
-            ))}
-          </ol>
-          <p className={styles.lede}>
-            A browser robotics sandbox. Your webcam tracks your hand, chrome robot hands move with it. Nothing leaves this tab.
-          </p>
-        </div>
-
-        <div className={styles.heroFoot}>
-          <a href="#lineup" className={styles.explore}>
-            <span className={styles.round} aria-hidden>
-              →
+    <HandTrackingProvider workspace={workspace} surface={heroRef} maxHands={1}>
+      <div className={`${styles.page} ${archivo.variable}`}>
+        <header className={styles.nav}>
+          <Link href="/" className={styles.wordmark}>
+            <span className={styles.burger} aria-hidden>
+              <i />
+              <i />
+              <i />
             </span>
-            Explore now
-          </a>
-        </div>
+            Sleight
+          </Link>
+          <nav className={styles.navLinks}>
+            <Link href="/arcade">Arcade</Link>
+            <Link href="/theatre">Theatre</Link>
+            <a href="#venue">How it works</a>
+            <a href="https://github.com/Omkarshinde19/sleight" rel="noreferrer">GitHub</a>
+          </nav>
+          <Link href="/arcade" className={styles.pill}>
+            Enter
+          </Link>
+        </header>
 
-        <p className={styles.tag}>
-          Real hands
-          <br />
-          real physics
-        </p>
-      </section>
-
-      <div className={styles.ticker} aria-hidden>
-        <div>
-          {[...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
-            <span key={i}>{t}</span>
-          ))}
-        </div>
-      </div>
-
-      <main>
-        <section id="lineup" className={styles.lineup}>
-          <header className={styles.sectionHead}>
-            <p className={styles.label}>The lineup</p>
-            <h2>
-              Two rooms.
-              <br />
-              <em>One hand.</em>
-            </h2>
-          </header>
-
-          {ROOMS.map((r) => (
-            <article key={r.id} className={styles.room} data-room={r.id}>
-              <div className={styles.photo}>
-                {/* eslint-disable-next-line @next/next/no-img-element -- a static screenshot, styled as halftone in CSS */}
-                <img src={r.image} alt={`The ${r.name}`} loading="lazy" />
-                <span className={styles.verb} aria-hidden>
-                  {r.verb}
-                </span>
-              </div>
-              <div className={styles.roomText}>
-                <p className={styles.label}>
-                  {r.n} · {r.name}
-                </p>
-                <h3>{r.name}</h3>
-                <p>{r.lede}</p>
-                <dl>
-                  {r.facts.map(([k, v]) => (
-                    <div key={k}>
-                      <dt>{k}</dt>
-                      <dd>{v}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <Link href={r.href} className={styles.pill}>
-                  Enter the {r.name} <span aria-hidden>→</span>
-                </Link>
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section id="venue" className={styles.venue}>
-          <header className={styles.sectionHead}>
-            <p className={styles.label}>How it works</p>
-            <h2>
-              The venue is
-              <br />
-              <em>your browser.</em>
-            </h2>
-          </header>
-          <div className={styles.venueGrid}>
-            <dl className={styles.details}>
-              {VENUE.map(([k, v]) => (
-                <div key={k}>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </div>
-              ))}
-              <div>
-                <dt>Forecast</dt>
-                <dd>
-                  Rain beads on the chrome, snow settles on the knuckles.
-                  <span className={styles.weather} role="group" aria-label="Weather">
-                    {WEATHER.map((w) => (
-                      <button key={w.kind} aria-pressed={weather === w.kind} onClick={() => setWeather(w.kind)}>
-                        {w.label}
-                      </button>
-                    ))}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-            <div>
-              <p className={styles.label}>Set list</p>
-              <ol className={styles.setList}>
-                {SET_LIST.map(([k, v], i) => (
-                  <li key={k}>
-                    <span>{String(i + 1).padStart(2, "0")}</span>
-                    <b>{k}</b>
-                    <small>{v}</small>
-                  </li>
-                ))}
-              </ol>
-            </div>
+        <section
+          ref={heroRef}
+          className={styles.hero}
+          onPointerMove={point}
+          onPointerDown={(e) => {
+            point(e);
+            hero.pressed = true;
+          }}
+          onPointerUp={() => (hero.pressed = false)}
+          onPointerCancel={() => {
+            hero.pressed = false;
+            hero.pointer.active = false;
+          }}
+          onPointerLeave={() => {
+            hero.pressed = false;
+            hero.pointer.active = false;
+          }}
+        >
+          <div className={styles.blobs} aria-hidden>
+            {showStage && <Blobs active={heroInView} />}
           </div>
-        </section>
-      </main>
+          <h1 className={styles.headline} aria-label="Sleight of hand">
+            <span className={styles.lineTop} aria-hidden>
+              {spell("Sleight")}
+            </span>
+            <span className={styles.lineBottom} aria-hidden>
+              {spell("of hand")}
+            </span>
+          </h1>
+          <div className={styles.stage} aria-hidden>
+            {showStage && <LandingStage active={heroInView} />}
+          </div>
 
-      <footer className={styles.footer}>
-        <p className={styles.footMark} aria-hidden>
-          Sleight
-        </p>
-        <p className={styles.label}>
-          Built with MediaPipe, three.js and Rapier · <a href="https://github.com/Omkarshinde19/sleight">Source</a>
-        </p>
-      </footer>
-    </div>
+          <p className={styles.stack} data-preview={preview ?? undefined}>
+            {stack.map((w) => (
+              <span key={w}>{w}</span>
+            ))}
+            <span className={styles.hint}>Move the mouse · press to make a fist · grab a letter</span>
+          </p>
+
+          <div className={styles.side}>
+            <ol className={styles.index}>
+              {ROOMS.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={r.href}
+                    onPointerEnter={() => previewRoom(r.id)}
+                    onPointerLeave={() => previewRoom(null)}
+                    onFocus={() => previewRoom(r.id)}
+                    onBlur={() => previewRoom(null)}
+                  >
+                    <span>{r.n}</span> {r.name}
+                  </Link>
+                </li>
+              ))}
+            </ol>
+            <p className={styles.lede}>
+              A browser robotics sandbox. Your webcam tracks your hand, chrome robot hands move with it. Nothing leaves this tab.
+            </p>
+            <HeroCamera />
+          </div>
+
+          <div className={styles.heroFoot}>
+            <a href="#lineup" className={styles.explore}>
+              <span className={styles.round} aria-hidden>
+                →
+              </span>
+              Explore now
+            </a>
+          </div>
+
+          <p className={styles.tag}>
+            Real hands
+            <br />
+            real physics
+          </p>
+        </section>
+
+        <div className={styles.ticker} aria-hidden>
+          <div>
+            {[...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
+              <span key={i}>{t}</span>
+            ))}
+          </div>
+        </div>
+
+        <main>
+          <section id="lineup" className={styles.lineup}>
+            <header className={styles.sectionHead}>
+              <p className={styles.label}>The lineup</p>
+              <h2>
+                Two rooms.
+                <br />
+                <em>One hand.</em>
+              </h2>
+            </header>
+
+            {ROOMS.map((r) => (
+              <article key={r.id} className={styles.room} data-room={r.id}>
+                <div className={styles.photo}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a static screenshot, styled as halftone in CSS */}
+                  <img src={r.image} alt={`The ${r.name}`} loading="lazy" />
+                  <span className={styles.verb} aria-hidden>
+                    {r.verb}
+                  </span>
+                </div>
+                <div className={styles.roomText}>
+                  <p className={styles.label}>
+                    {r.n} · {r.name}
+                  </p>
+                  <h3>{r.name}</h3>
+                  <p>{r.lede}</p>
+                  <dl>
+                    {r.facts.map(([k, v]) => (
+                      <div key={k}>
+                        <dt>{k}</dt>
+                        <dd>{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <Link href={r.href} className={styles.pill}>
+                    Enter the {r.name} <span aria-hidden>→</span>
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <section id="venue" className={styles.venue}>
+            <header className={styles.sectionHead}>
+              <p className={styles.label}>How it works</p>
+              <h2>
+                The venue is
+                <br />
+                <em>your browser.</em>
+              </h2>
+            </header>
+            <div className={styles.venueGrid}>
+              <dl className={styles.details}>
+                {VENUE.map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+                <div>
+                  <dt>Forecast</dt>
+                  <dd>
+                    Rain beads on the chrome, snow settles on the knuckles.
+                    <span className={styles.weather} role="group" aria-label="Weather">
+                      {WEATHER.map((w) => (
+                        <button key={w.kind} aria-pressed={weather === w.kind} onClick={() => setWeather(w.kind)}>
+                          {w.label}
+                        </button>
+                      ))}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              <div>
+                <p className={styles.label}>Set list</p>
+                <ol className={styles.setList}>
+                  {SET_LIST.map(([k, v], i) => (
+                    <li key={k}>
+                      <span>{String(i + 1).padStart(2, "0")}</span>
+                      <b>{k}</b>
+                      <small>{v}</small>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer className={styles.footer}>
+          <p className={styles.footMark} aria-hidden>
+            Sleight
+          </p>
+          <p className={styles.label}>
+            Built with MediaPipe, three.js and Rapier · <a href="https://github.com/Omkarshinde19/sleight">Source</a>
+          </p>
+        </footer>
+      </div>
+    </HandTrackingProvider>
   );
 }

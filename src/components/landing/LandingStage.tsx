@@ -14,9 +14,9 @@ import { makeChromeMaterial } from "@/lib/materials/chrome";
 import type { TrackedHand } from "@/lib/tracking/processor";
 import { handStore } from "@/state/handStore";
 import { Halftone } from "./Halftone";
-import { hero } from "./hero";
+import { cameraDistance, hero, LANDING_WORKSPACE } from "./hero";
 
-const HAND_SCALE = 1.44;
+const HAND_SCALE = LANDING_WORKSPACE.handScale;
 const WS: Workspace = { center: { x: 0, y: 0, z: 0 }, width: 1, height: 1, depthGain: 1, depthRange: 1, handScale: HAND_SCALE };
 /** The camera looks at this point; the hand moves on the plane z = 0 through it. */
 const LOOK = new THREE.Vector3(0, 1.13, 0);
@@ -56,8 +56,23 @@ function Driver() {
     const dt = Math.min(dtRaw, 0.05);
     const t = state.clock.elapsedTime;
     const portrait = size.width < size.height;
-    camera.position.set(0, 1.2, portrait ? 2.6 : 1.55);
+    camera.position.set(0, 1.2, cameraDistance(size.width, size.height));
     camera.lookAt(LOOK);
+
+    // your own hand, through the camera (or a recorded session): the tracker drives the robot hand
+    const st = handStore.getState();
+    if (st.source && st.status === "running") {
+      const h = st.hands.Right ?? st.hands.Left;
+      hero.hand.visible = !!h;
+      if (ball.current) ball.current.visible = false;
+      if (scalpel.current) scalpel.current.visible = false;
+      if (!h) return;
+      projected.copy(toV(h.grip)).project(camera);
+      hero.hand.x = (projected.x * 0.5 + 0.5) * size.width;
+      hero.hand.y = (-projected.y * 0.5 + 0.5) * size.height;
+      hero.hand.closed = h.gesture === "fist" || h.gesture === "pinch";
+      return;
+    }
 
     const L = live.current;
     const P = hero.pointer;
@@ -164,6 +179,7 @@ export default function LandingStage({ active }: { active: boolean }) {
       <Weather />
       <Suspense fallback={null}>
         <RobotHand hand="Right" scale={HAND_SCALE} />
+        <RobotHand hand="Left" scale={HAND_SCALE} />
       </Suspense>
       <Driver />
       <Halftone />

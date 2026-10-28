@@ -181,9 +181,9 @@
   position: absolute;
   z-index: 4;
   right: var(--gutter);
-  top: 42vh;
+  top: 33vh;
   display: grid;
-  gap: 28px;
+  gap: 24px;
   width: 250px;
 }
 
@@ -246,6 +246,43 @@
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--paper-dim);
+}
+
+.camera {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.camera .pill {
+  cursor: pointer;
+}
+
+.camera .pill[data-on] {
+  border-color: var(--pink);
+}
+
+.rec {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pink);
+}
+
+.camera .pill[data-on] .rec {
+  animation: rec 1.2s ease-in-out infinite;
+}
+
+@keyframes rec {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.cameraNote {
+  font-size: 12px;
+  color: var(--paper-dim);
+  max-width: 300px;
 }
 
 .explore {
