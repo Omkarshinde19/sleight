@@ -12,8 +12,12 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
 
 ## What's in it
 
-- **Landing page.** A scroll story of the three hands, before anything asks for the camera. Chrome hands
-  re-pose for each chapter, and blueprint callouts track live joint angles, pinch and grip.
+- **Landing page.** A festival poster in jet black, hot pink (#FF2DA8) and chartreuse (#D4FF3F): a
+  split SLEIGHT / OF HAND headline with the robot hand between the lines, printed live in halftone. The
+  mouse (or a finger) moves the hand and pressing makes a fist. An open hand pushes the liquid blobs
+  aside and a fist squeezes them. Close it on a headline letter to carry the letter off; it springs back.
+  Hovering a room in the index makes the hand act it out (a throw, a scalpel stroke), and **Try it with
+  your camera** hands the hero to your own tracked hand. Nothing asks for the camera until you click it.
 - **Arcade Room** (`/arcade`). Cup a basketball with a half-closed hand, the way you'd really hold one. It
   stays in your hand until your fingers open. Opening slowly drops it; a sudden flick as you open throws it
   with your hand's recent velocity: a least-squares fit over the fastest 120 ms (and at least four tracker
@@ -55,8 +59,9 @@ Camera access needs `localhost` or HTTPS. To try it on a phone, use the deployed
 
 ## How to demo
 
-1. Open the landing page and scroll through the three hands. Nothing asks for the camera yet.
-2. Click **Start with the Arcade** and choose **Use my camera**. Allow the camera.
+1. Open the landing page. Move the mouse to steer the hand, press to make a fist, and grab a letter.
+   Hover **01 Arcade Room** and **02 Operating Theatre**. Nothing asks for the camera yet.
+2. Click **Enter the Arcade Room** (or **Enter**) and choose **Use my camera**. Allow the camera.
    - Hold your hand up about 50 cm from the camera for a second. Depth calibrates on the first frames
      (**Calibrate** redoes it).
    - Good light from the front works best. A bright window behind you makes tracking harder.
@@ -107,7 +112,7 @@ replay ─▶ PlaybackSource (recorded JSON)                                  �
 | `src/components/physics/HandPhysics.tsx` | Hand colliders and the grab system |
 | `src/components/scene/` | Shared scene shell, studio lighting, floor |
 | `src/scenes/{arcade,theatre}` | The two scenes, each a lazy, client-only route |
-| `src/components/landing/` | Landing page and its 3D stage |
+| `src/components/landing/` | Landing page: the poster, its halftone hand stage, blobs, grabbable letters, camera pill |
 
 ### Design decisions worth knowing
 
