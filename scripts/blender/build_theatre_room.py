@@ -5,12 +5,15 @@
 A 7 x 7 m room with a 3 m ceiling, centred on the operating table, after a hybrid operating room:
 blue-violet wall panels on dark seams, a skirting, sliding double doors straight ahead, a recessed wall
 monitor, a control panel and the horse painting on the front wall, a warm
-grey floor with a pale blue round inlay under the table, and a white ceiling with LED light panels.
+grey floor with a pale blue round inlay under the table, a white ceiling with LED light panels, a ceiling
+boom carrying twin round surgical lights over the table; the wall monitor shows vital signs.
 
 Contract with the code (see docs/BLENDER.md):
 - The floor's top is at height 0; everything is visual only (the floor collider is in code).
 - One mesh per material, each named "Room_<Material>", so the room is a handful of draw calls.
 - The table's centre (three.js x -0.1, z -0.4) is the room's centre on the floor.
+- Empties LIGHT_Surgical_A / _B mark the surgical lights' faces and LIGHT_Surgical_A_TARGET / _B_TARGET
+  where they aim; the code puts its live spotlights there.
 """
 
 import math
@@ -18,7 +21,7 @@ import os
 
 import bmesh
 import bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -38,11 +41,19 @@ SKIRT = 0.12
 PANEL_TOP = 2.9
 
 DOOR = {"u": (2.0, 4.0), "height": 2.2, "header": 0.12}  # front wall, panel columns 2-3
-MONITOR = {"u": 1.0, "z": 1.55, "size": (1.3, 0.75)}  # front wall, centre of columns 0-1
+MONITOR = {"u": 1.0, "z": 1.55, "size": (1.2, 0.75)}  # front wall, centre of columns 0-1
 CONTROL = {"u": 4.5, "z": 1.3, "size": (0.4, 0.5)}  # front wall, beside the doors
 PAINTING = {"u": 6.0, "z": 1.6, "size": (1.8, 1.2), "depth": 0.04}  # front wall right of the doors, a wrapped canvas
 PAINTING_IMAGE = os.path.join(ROOT, "assets/textures/painting.jpg")
 INLAY = {"radius": 2.2, "ring": 0.06}
+
+# Surgical lights: twin heads on a ceiling boom, aimed at the operating field. three.js (x, y, z) is
+# Blender (x, -z, y): head A hangs at three (-0.45, 2.3, -1.05), head B at (0.35, 2.35, -1.15), high and
+# far enough back to frame the top of the view without covering the doors.
+FIELD = Vector((-0.1, 0.4, 1.05))  # where the lights aim: the abdomen
+HUB = Vector((CX, CY, HEIGHT))
+HEADS = {"A": (Vector((-0.45, 1.05, 2.3)), 2.75), "B": (Vector((0.35, 1.15, 2.35)), 2.66)}  # centre, arm height
+HEAD_RADIUS = 0.3
 
 
 def linear(hex_colour):
@@ -66,11 +77,14 @@ MATERIALS = {
     "DoorSteel": ("#A4A9B3", 0.4, 0.6, None, 0),
     "DoorGlass": ("#1E2A3A", 0.15, 0.0, None, 0),
     "MonitorBezel": ("#16181E", 0.45, 0.2, None, 0),
-    "MonitorScreen": ("#0E1822", 0.2, 0.0, "#2E6E8E", 0.6),
     "ControlPanel": ("#C9CDD4", 0.45, 0.3, None, 0),
     "ControlLight": ("#3FD08A", 0.4, 0.0, "#3FD08A", 2.0),
     "Painting": ("#FFFFFF", 0.7, 0.0, None, 0),
     "CanvasEdge": ("#EDEBE6", 0.8, 0.0, None, 0),
+    "LampHousing": ("#E8EBF0", 0.35, 0.3, None, 0),
+    "LampLED": ("#FFFFFF", 0.3, 0.0, "#FFF6EA", 6.0),
+    "BoomArm": ("#D3D7DE", 0.35, 0.5, None, 0),
+    "VitalsScreen": ("#000000", 0.3, 0.0, "#FFFFFF", 1.4),
 }
 
 
@@ -99,6 +113,17 @@ def box(mat, x0, x1, y0, y1, z0, z1):
     centre = [(l + h) / 2 for l, h in zip(lo, hi)]
     m = Matrix.Translation(centre) @ Matrix.Diagonal((*size, 1.0))
     bmesh.ops.create_cube(meshes[mat], size=1.0, matrix=m)
+
+
+def cylinder(mat, p0, p1, r, r1=None, segments=24):
+    """A cylinder (or cone, radius r at p0 and r1 at p1) between two points."""
+    d = p1 - p0
+    m = Matrix.Translation((p0 + p1) / 2) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    bmesh.ops.create_cone(meshes[mat], cap_ends=True, segments=segments, radius1=r, radius2=r if r1 is None else r1, depth=d.length, matrix=m)
+
+
+def sphere(mat, centre, r):
+    bmesh.ops.create_uvsphere(meshes[mat], u_segments=16, v_segments=8, radius=r, matrix=Matrix.Translation(centre))
 
 
 class Wall:
@@ -165,7 +190,13 @@ def front_wall():
     w, hh = MONITOR["size"]
     u, z = MONITOR["u"], MONITOR["z"]
     FRONT.box("MonitorBezel", u - w / 2 - 0.04, u + w / 2 + 0.04, PANEL_DEPTH, PANEL_DEPTH + 0.03, z - hh / 2 - 0.04, z + hh / 2 + 0.04)
-    FRONT.box("MonitorScreen", u - w / 2, u + w / 2, PANEL_DEPTH + 0.03, PANEL_DEPTH + 0.032, z - hh / 2, z + hh / 2)
+    bm = meshes["VitalsScreen"]
+    uv = bm.loops.layers.uv.new("UVMap")
+    d = PANEL_DEPTH + 0.032
+    corners = [(u - w / 2, z - hh / 2, (0, 0)), (u + w / 2, z - hh / 2, (1, 0)), (u + w / 2, z + hh / 2, (1, 1)), (u - w / 2, z + hh / 2, (0, 1))]
+    f = bm.faces.new([bm.verts.new((*FRONT.point(cu, d), cz)) for cu, cz, _ in corners])
+    for loop, (_, _, st) in zip(f.loops, corners):
+        loop[uv].uv = st
     # control panel with a column of status lights
     w, hh = CONTROL["size"]
     u, z = CONTROL["u"], CONTROL["z"]
@@ -223,6 +254,106 @@ def painting():
         loop[uv].uv = st
 
 
+def surgical_lights():
+    """Ceiling hub, a column, an arm and a yoke per head; each head a domed housing whose face (toward
+    the field) carries LED cells round a sterile handle."""
+    sphere("BoomArm", HUB - Vector((0, 0, 0.02)), 0.11)
+    cylinder("BoomArm", HUB, Vector((HUB.x, HUB.y, 2.56)), 0.06)
+    for centre, arm_z in HEADS.values():
+        n = (FIELD - centre).normalized()  # the face points at the field
+        u = n.orthogonal().normalized()
+        v = n.cross(u)
+        elbow = Vector((HUB.x, HUB.y, arm_z))
+        above = Vector((centre.x, centre.y, arm_z))
+        sphere("BoomArm", elbow, 0.045)
+        cylinder("BoomArm", elbow, above, 0.03)
+        sphere("BoomArm", above, 0.04)
+        top = centre - n * 0.15
+        cylinder("BoomArm", above, top, 0.022)
+        sphere("BoomArm", top, 0.03)
+        cylinder("LampHousing", centre - n * 0.05, centre + n * 0.03, HEAD_RADIUS, segments=48)
+        cylinder("LampHousing", centre - n * 0.05, top, HEAD_RADIUS, 0.09, segments=48)
+        face = centre + n * 0.03
+        for k in range(8):
+            a = 2 * math.pi * k / 8
+            c = face + (u * math.cos(a) + v * math.sin(a)) * 0.2
+            cylinder("LampLED", c, c + n * 0.004, 0.06)
+        for k in range(4):
+            a = 2 * math.pi * k / 4 + math.pi / 4
+            c = face + (u * math.cos(a) + v * math.sin(a)) * 0.095
+            cylinder("LampLED", c, c + n * 0.004, 0.04)
+        cylinder("BoomArm", face, face + n * 0.11, 0.022)  # sterile handle
+
+
+def vitals_image(w=640, h=400):
+    """Vital signs, drawn into an image: ECG, SpO2 and respiration traces with 7-segment readings."""
+    import numpy as np
+
+    px = np.zeros((h, w, 4), dtype=np.float32)
+    px[..., :3] = (0.02, 0.03, 0.045)
+    px[..., 3] = 1
+
+    def dot(x, y, colour, r=2):
+        x, y = int(x), int(y)
+        px[max(0, y - r) : y + r, max(0, x - r) : x + r, :3] = colour
+
+    def trace(f, y0, amp, colour, x1=440):
+        prev = None
+        for x in range(16, x1):
+            y = y0 - amp * f(x)
+            if prev is not None:
+                for t in np.linspace(0, 1, 6):
+                    dot(x - 1 + t, prev + (y - prev) * t, colour)
+            prev = y
+
+    def ecg(x):
+        t = (x % 110) / 110
+        if 0.30 < t < 0.34:
+            return (t - 0.30) / 0.04 * 1.0
+        if 0.34 <= t < 0.38:
+            return 1.0 - (t - 0.34) / 0.04 * 1.4
+        if 0.38 <= t < 0.41:
+            return -0.4 + (t - 0.38) / 0.03 * 0.4
+        if 0.55 < t < 0.7:
+            return 0.18 * math.sin((t - 0.55) / 0.15 * math.pi)
+        if 0.12 < t < 0.2:
+            return 0.1 * math.sin((t - 0.12) / 0.08 * math.pi)
+        return 0.0
+
+    green, cyan, yellow = (0.25, 1.0, 0.45), (0.3, 0.85, 1.0), (1.0, 0.85, 0.25)
+    trace(ecg, 100, 60, green)
+    trace(lambda x: max(0.0, math.sin(x / 110 * 2 * math.pi)) ** 1.5, 230, 45, cyan)
+    trace(lambda x: math.sin(x / 260 * 2 * math.pi), 330, 22, yellow)
+    px[:, 452:454, :3] = (0.15, 0.18, 0.22)
+
+    SEGMENTS = {"0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcfgd"}
+
+    def digit(ch, x, y, colour, s=26):
+        t = max(3, s // 6)
+        bars = {"a": (x, y, s, t), "g": (x, y + s, s, t), "d": (x, y + 2 * s, s, t), "f": (x, y, t, s), "b": (x + s - t, y, t, s), "e": (x, y + s, t, s), "c": (x + s - t, y + s, t, s)}
+        for seg in SEGMENTS[ch]:
+            bx, by, bw, bh = bars[seg]
+            px[by : by + bh + t, bx : bx + bw, :3] = colour
+
+    for text, y, colour in (("72", 60, green), ("98", 190, cyan), ("16", 300, yellow)):
+        for i, ch in enumerate(text):
+            digit(ch, 480 + i * 40, y, colour)
+    img = bpy.data.images.new("vitals", w, h)
+    img.pixels.foreach_set(px[::-1].ravel())  # Blender images start at the bottom row
+    img.pack()
+    return img
+
+
+def light_markers(scene):
+    for name, (centre, _) in HEADS.items():
+        n = (FIELD - centre).normalized()
+        for suffix, at in (("", centre + n * 0.04), ("_TARGET", FIELD)):
+            e = bpy.data.objects.new(f"LIGHT_Surgical_{name}{suffix}", None)
+            e.empty_display_size = 0.1
+            e.location = at
+            scene.collection.objects.link(e)
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -235,6 +366,7 @@ def build():
     for wall in (RIGHT, BACK, LEFT):
         panels(wall)
     painting()
+    surgical_lights()
 
     for name, spec in MATERIALS.items():
         bm = meshes[name]
@@ -251,10 +383,17 @@ def build():
             tex.image.pack()
             bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
             links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        if name == "VitalsScreen":
+            nodes, links = mat.node_tree.nodes, mat.node_tree.links
+            tex = nodes.new("ShaderNodeTexImage")
+            tex.image = vitals_image()
+            bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
+            links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
         mesh.materials.append(mat)
         obj = bpy.data.objects.new(f"Room_{name}", mesh)
         scene.collection.objects.link(obj)
 
+    light_markers(scene)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "assets/blender/theatre-room.blend"), compress=True)
 
 
