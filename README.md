@@ -16,7 +16,8 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
   re-pose for each chapter, and blueprint callouts track live joint angles, pinch and grip.
 - **Arcade Room** (`/arcade`). Cup a basketball with a half-closed hand, the way you'd really hold one. It
   stays in your hand until your fingers open. Opening slowly drops it; a sudden flick as you open throws it
-  with your hand's recent velocity: a least-squares fit over the fastest 120 ms before release. Brushing
+  with your hand's recent velocity: a least-squares fit over the fastest 120 ms (and at least four tracker
+  frames) before release. Brushing
   the rack can't knock balls off, and dropped or missed balls go back to their cradles. It scores
   only when it drops down through the rim. You get streaks, a hoop that starts to drift from a streak of 3,
   dashed trajectory arcs and an aim assist (off / fair / strong).
@@ -29,7 +30,9 @@ served from this site rather than a CDN. Webcam frames are never uploaded: there
   purple guide (skin, then fascia: nothing is cut off the guide), seat a Balfour retractor, cut out the
   dead segment of bowel with scissors and lift it into the kidney dish with forceps, stitch the healthy
   ends together with the needle driver, and staple the skin. One instrument at a time, picked up with a
-  pinch and closed with a squeeze; put down, it goes back to the Mayo tray. Tools stop at tissue, with
+  pinch and closed with a squeeze; put down, it goes back to the Mayo tray. Holding one, slow moves are
+  scaled down by half, like a surgical robot's motion scaling, and the hand leans forward over the
+  patient. Tools stop at tissue, with
   live penetration from the physics contacts; a hand inside the patient raises a sterile-field breach.
   The HUD scores accuracy, strays off the guides and breaches.
 - **Weather in every scene.** Rain beads on the chrome and dries when it stops; snow settles on the
@@ -122,10 +125,17 @@ replay ─▶ PlaybackSource (recorded JSON)                                  �
   dynamic bodies whose velocity is steered toward the hand every physics step. The contact solver stops
   them at tissue, with stiffer contacts and soft CCD in that scene.
 - **MediaPipe depth is weak.** Depth comes from apparent palm size: image length ÷ metric length, taking
-  the largest of four palm segments, which limits foreshortening. It is calibrated on the first frames and
-  smoothed harder than x/y.
-- **Grabs don't flicker.** Each gesture has an enter and a looser exit threshold, and must win 3 frames
-  in a row before it switches.
+  the largest of four palm segments, which limits foreshortening. It is calibrated from the first steady
+  second (judged by speed per second, so it works at any tracker rate), or after 4 s from the typical
+  distance if the hand never holds still, and smoothed harder than x/y.
+- **Grabs don't flicker.** Each gesture has an enter and a looser exit threshold, and must win for 60 ms
+  (and two frames) before it switches.
+- **The tracker shares the GPU with the scene.** In a heavy scene MediaPipe's GPU delegate measured
+  45–70 ms a frame (11–19 fps). So the worker times the GPU and CPU delegates on the first frames with a
+  hand and keeps the faster one (remembered per page), frames are capped at 640 px wide, the Theatre
+  tracks one hand (with two, the palm detector runs every frame looking for the second), and the canvas
+  drops to 1x pixels if the tracker stays under 20 fps. The middle 84 % of the camera frame covers the
+  whole workspace, so reaching the edges of a scene doesn't take your hand out of view.
 
 ## Tests
 
