@@ -29,7 +29,7 @@ export default function TheatreScene() {
       brief="Hands never touch the patient. Pinch the scalpel and run it along the dotted line on the practice pad, then pinch the forceps, squeeze to grip each fragment in the wound and drop it in the kidney dish. The instruments stop at tissue — watch the ghost when you push."
       demo="/sessions/demo.json"
       workspace={WORKSPACE}
-      camera={{ position: [0.02, 1.62, 0.62], fov: 50, lookAt: [0, 1.0, -0.42] }}
+      camera={{ position: [0.02, 1.7, 0.8], fov: 62, lookAt: [0.05, 1.33, -1.2] }}
       hud={<TheatreHud />}
       // Stiffer, more precise contacts than the other scenes: tools pushed into tissue should stop at it.
       physics={{ numSolverIterations: 8, allowedLinearError: 0.0002, contactNaturalFrequency: 60 }}
