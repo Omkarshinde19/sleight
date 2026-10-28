@@ -49,7 +49,8 @@ export function SceneControls({ demo }: { demo: string }) {
       {help && source === "sim" && (
         <div className={`${styles.help} glass mono`} role="note">
           <div><kbd>Mouse</kbd> move hand · <kbd>Click</kbd>/<kbd>Space</kbd> grab (fist)</div>
-          <div><kbd>Shift</kbd>+click pinch · <kbd>Wheel</kbd> or <kbd>R</kbd>/<kbd>F</kbd> depth</div>
+          <div><kbd>Shift</kbd>+click pinch · <kbd>R</kbd>/<kbd>F</kbd> depth</div>
+          <div><kbd>Right-drag</kbd> look around · <kbd>Wheel</kbd> zoom</div>
           <div><kbd>1–5</kbd> open · pinch · fist · point · claw · <kbd>T</kbd> throw flick</div>
           <div><kbd>Q/E</kbd> roll · <kbd>W/S</kbd> pitch · <kbd>A/D</kbd> yaw · <kbd>0</kbd> reset</div>
           <div><kbd>Tab</kbd> switch hand · <kbd>H</kbd> show/hide other hand · <kbd>`</kbd> debug</div>

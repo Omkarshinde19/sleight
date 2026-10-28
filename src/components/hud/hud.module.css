@@ -296,3 +296,17 @@
   z-index: 6;
   white-space: nowrap;
 }
+
+.resetView {
+  position: absolute;
+  bottom: max(36px, calc(env(safe-area-inset-bottom) + 22px));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(127, 227, 240, 0.4);
+  color: var(--bone);
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 3;
+}

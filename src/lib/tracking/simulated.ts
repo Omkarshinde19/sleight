@@ -210,6 +210,7 @@ export class SimulatedSource implements TrackingSource {
     };
 
     on(el, "pointermove", (e) => {
+      if (e.buttons & 2) return; // right-drag looks around (CameraRig)
       const r = el.getBoundingClientRect();
       const h = this.hands[this.active];
       delete this.goals[this.active];
@@ -223,12 +224,6 @@ export class SimulatedSource implements TrackingSource {
     on(window, "pointerup", (e) => {
       if (e.button === 0) this.hands[this.active].target = "open";
     });
-    on(el, "wheel", (e) => {
-      const h = this.hands[this.active];
-      h.distance = clamp(h.distance + e.deltaY * 0.0006, NEAR, FAR);
-      e.preventDefault();
-    }, { passive: false });
-
     on(window, "keydown", (e) => {
       if ((e.target as HTMLElement)?.closest?.("input, textarea, select")) return;
       const key = e.key.toLowerCase();

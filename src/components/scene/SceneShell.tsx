@@ -7,12 +7,14 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { DEFAULT_WORKSPACE, type Workspace } from "@/lib/hand/mapping";
 import { useHandStore } from "@/state/handStore";
+import { useView, viewMoved } from "@/state/viewStore";
 import { RobotHand } from "../hands/RobotHand";
 import { DebugOverlay } from "../hud/DebugOverlay";
 import { SourceChooser } from "../hud/SourceChooser";
 import { SceneControls } from "../hud/SceneControls";
 import styles from "../hud/hud.module.css";
 import { HandTrackingProvider, isTouchDevice, resumableSource, useTracking } from "../tracking/HandTrackingProvider";
+import { CameraRig } from "./CameraRig";
 import { ExposeThree } from "./ExposeThree";
 import { Studio } from "./Studio";
 import { Weather } from "../weather/Weather";
@@ -52,6 +54,7 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
   const source = useHandStore((s) => s.source);
   const status = useHandStore((s) => s.status);
   const calibrating = useHandStore((s) => s.calibrating && s.source === "camera" && Object.keys(s.hands).length > 0);
+  const moved = useView(viewMoved);
 
   // ?source=sim|camera|demo starts straight away (used for demos and automated checks).
   useEffect(() => {
@@ -88,8 +91,8 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
         dpr={[1, dpr]}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         camera={{ position: cam.position, fov: cam.fov ?? 50, near: 0.05, far: 60 }}
-        onCreated={({ camera }) => cam.lookAt && camera.lookAt(...cam.lookAt)}
       >
+        <CameraRig position={cam.position} lookAt={cam.lookAt ?? [0, 1, -0.6]} fov={cam.fov ?? 50} surface={surface} />
         <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(isTouchDevice() ? 1.5 : 2)} />
         {lighting ? <Suspense fallback={null}>{lighting}</Suspense> : <Studio />}
         <Weather />
@@ -118,6 +121,11 @@ function SceneInner({ title, brief, children, hud, workspace = DEFAULT_WORKSPACE
       </p>
 
       {hud}
+      {moved && (
+        <button className={`${styles.resetView} glass mono`} onClick={() => useView.getState().reset()} data-testid="reset-view">
+          Reset view
+        </button>
+      )}
       {calibrating && (
         <p className={`${styles.calibrating} glass mono`} role="status">
           Hold your hand still for a second — calibrating depth

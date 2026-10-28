@@ -33,7 +33,7 @@ export function SourceChooser({ title, brief, demo }: { title: string; brief: st
           </button>
           <button className={styles.choice} onClick={() => tracking.startSim()} data-testid="start-sim">
             <b>Simulated hand</b>
-            <span>Mouse moves, click grabs, wheel for depth.</span>
+            <span>Mouse moves, click grabs, R/F for depth.</span>
           </button>
           <button className={styles.choice} onClick={() => tracking.startPlayback(demo)} data-testid="start-demo">
             <b>Play a recording</b>
