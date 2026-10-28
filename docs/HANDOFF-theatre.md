@@ -13,7 +13,7 @@ generalise beyond what they ask.
 ## What this project is
 
 Sleight: a browser robotics sandbox. Your webcam hand (MediaPipe) drives chrome robot hands through three
-physics scenes (arcade, industrial, theatre), all client-side, on three.js / React Three Fiber + Rapier.
+physics scenes (arcade, theatre; the industrial room was removed on 2026-10-28), all client-side, on three.js / React Three Fiber + Rapier.
 Repo `Omkarshinde19/sleight`, branch `main`, local folder `…/RAL project/sleight` (open sessions *in this
 folder* so the `blender` MCP server's tools load; it's registered local-scope here).
 
@@ -56,7 +56,7 @@ v3 plan: `docs/PLAN-v3.md`. Blender pipeline and hand contract: `docs/BLENDER.md
     break under Turbopack). Falls back to the main thread. Camera asks for 60 fps.
   - Poses stamped by capture time (`src/lib/tracking/frameClock.ts`) so motion doesn't step.
   - **Hands only (2026-10-28):** no forearm or elbow any more; the hand ends at a 5 cm wrist cuff in line
-    with the hand. Every hand is 1.6x smaller (theatre 0.75, arcade 0.94, industrial 0.875, landing 1.44).
+    with the hand. Every hand is 1.6x smaller (theatre 0.75, arcade 0.94, landing 1.44).
   - **Mouse camera in every scene:** right-drag looks around from where you stand (±60° sideways, ±40°
     up/down), the wheel zooms (0.75–3x), "Reset view" restores it (`CameraRig`, `useView`). The simulated
     hand ignores right-drags; its depth is R/F only.
@@ -99,10 +99,7 @@ Blender-built operating room. Models and their contracts: `docs/BLENDER.md`.
 - `e2e/theatre.spec.ts` "one instrument at a time" timed out once against the live site, then passed
   twice; the old scalpel-into-pad flake went with the old theatre.
 - The operating field sits low in camera C2: the cut rings and stitch dots are small. A "lean in"
-  camera for steps 3–5 is a possible follow-up (not asked for). Industrial "fist can't pick up the
-  microchip" flakes ~1 in 17 since the snappier smoothing.
-- With the smaller hands, a fist made right on the industrial microchip can flick it off the bench (the
-  e2e test now makes its fist 3 cm above the chip).
+  camera for steps 3–5 is a possible follow-up (not asked for).
 - About 14 % of the left hand's tight-fist frames in the recorded session sit borderline (fingertip level
   with the knuckle); the raw tracker reads the same.
 - Nothing has been checked with the user's real webcam by you; they test it themselves and report.

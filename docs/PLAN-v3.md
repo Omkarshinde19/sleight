@@ -1,5 +1,7 @@
 # Sleight v3: Blender assets and the "Sound Waves" UI
 
+> **2026-10-28:** the industrial room is removed; the site has the arcade and the theatre.
+>
 > **Progress (2026-10-28):** Step 0 and Steps 1.1–1.3 are done and live, plus the arcade feel fixes
 > (smoothing, tracker worker, capture-time stamps, following forearm, skeleton flip fix). Next: the
 > surgery room. Hand-off: `docs/HANDOFF-theatre.md`.
@@ -56,7 +58,7 @@ The tracking, physics and grab system stay as they are. Only what you *see* chan
 | 1.2 | ✅ **Done (2026-10-28):** `HandRig` + `RobotHand` replace `ChromeHand` everywhere (see docs/BLENDER.md). **Drive the skinned hand from the tracker.** Each frame, turn each bone to point along the matching tracked bone (the rigid skeleton from v2 already gives fixed lengths). This replaces the procedural `ChromeHand` geometry. Physics colliders don't change. ⛔ **The user has input on this algorithm — get it first (see Open section).** | Keep the old `ChromeHand` behind a flag until the new one matches. |
 | 1.3 | **Materials.** Chrome stays: physical metal + iridescence in Blender, exported as glTF PBR with extensions three.js reads (clearcoat, iridescence). The rain and snow shader patch keeps working on top. | Weather uniforms reapply on the loaded material. |
 | 1.4 | **Lighting.** A free Poly Haven HDRI for reflections, instead of only procedural light strips. | ~1–2 MB at 1k resolution |
-| 1.5 | **Props.** Basketball, hoop, rack, microchip and socket, levers, scalpel and forceps, operating table. Collider shapes stay in code; the models are visual only. | One commit per prop |
+| 1.5 | **Props.** Basketball, hoop, rack, scalpel and forceps, operating table. Collider shapes stay in code; the models are visual only. | One commit per prop |
 | 1.6 | **Landing animations.** Keyframe the landing-page hand poses in Blender (or Theatre.js) instead of hand-tuned numbers in `LandingStage.tsx`. | Smoother than the current per-chapter interpolation |
 | 1.7 | **Performance budget.** Hand under 15k triangles, scene under 4 MB compressed, 60 fps on an M-series Mac, 30 fps on an iPhone. Checked in e2e. | |
 
