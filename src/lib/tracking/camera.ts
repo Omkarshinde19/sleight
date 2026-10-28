@@ -10,6 +10,26 @@ interface FrameMeta {
   mediaTime?: number;
 }
 
+/**
+ * The delegate the probe picked, per page (a heavy scene leaves the GPU less room than a light one), so
+ * later sessions start on it without probing.
+ */
+const delegateKey = () => `sleight.delegate.v1:${location.pathname}`;
+/**
+ * Frames wider than this are scaled down before tracking. The palm detector works at 192 px and the
+ * landmark model on a 224 px crop, so more pixels only cost upload and resize time.
+ */
+const MAX_TRACK_WIDTH = 640;
+
+function savedDelegate(): "GPU" | "CPU" | null {
+  try {
+    const v = localStorage.getItem(delegateKey());
+    return v === "GPU" || v === "CPU" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export class CameraError extends Error {
   constructor(
     message: string,
@@ -44,7 +64,8 @@ export class CameraSource implements TrackingSource {
     // Ask for the camera and load the tracker in parallel. If either fails, release the other,
     // otherwise a half-started camera stays locked and the next attempt can't open it.
     const cam = this.openCamera();
-    const tracker = this.startWorker(this.preferGpu ? "GPU" : "CPU").catch((e: Error) => {
+    const saved = this.preferGpu ? savedDelegate() : "CPU";
+    const tracker = this.startWorker(saved ?? "GPU", saved === null).catch((e: Error) => {
       console.warn(`Hand tracker worker unavailable (${e.message}); tracking on the main thread.`);
       return this.loadTracker(this.preferGpu ? "GPU" : "CPU");
     });
@@ -97,7 +118,17 @@ export class CameraSource implements TrackingSource {
         if (m.type === "result") {
           busy = false;
           if (this.running) emit({ t: m.t, hands: toRawHands(m.result), aspect: m.width / m.height || aspect(), latencyMs: m.detectMs });
-        } else if (m.type === "ready") this.delegate = m.delegate;
+        } else if (m.type === "ready") {
+          this.delegate = m.delegate;
+          this.onDelegate?.(m.delegate);
+          if (m.settled) {
+            try {
+              localStorage.setItem(delegateKey(), m.delegate);
+            } catch {
+              // storage blocked: the next session probes again
+            }
+          }
+        }
         else if (m.fatal) this.onError?.(`The hand tracker stopped: ${m.message}`);
       };
 
@@ -113,7 +144,10 @@ export class CameraSource implements TrackingSource {
           // One frame in flight at a time: a late frame is skipped, never queued (queues add lag).
           if (!busy) {
             busy = true;
-            createImageBitmap(video).then(
+            const scale = Math.min(1, MAX_TRACK_WIDTH / video.videoWidth);
+            const opts: ImageBitmapOptions | undefined =
+              scale < 1 ? { resizeWidth: Math.round(video.videoWidth * scale), resizeHeight: Math.round(video.videoHeight * scale), resizeQuality: "low" } : undefined;
+            createImageBitmap(video, opts).then(
               (bitmap) => worker.postMessage({ type: "frame", bitmap, t } satisfies TrackerRequest, [bitmap]),
               () => (busy = false),
             );
@@ -137,6 +171,8 @@ export class CameraSource implements TrackingSource {
 
   /** Called when the camera fails after starting (unplugged, permission revoked, tracker dead). */
   onError?: (message: string) => void;
+  /** The worker switched delegate (while probing, or after a GPU failure). */
+  onDelegate?: (delegate: "GPU" | "CPU") => void;
   /** Start on the CPU delegate (used after a GPU failure in this browser). */
   preferGpu = true;
 
@@ -191,7 +227,7 @@ export class CameraSource implements TrackingSource {
   }
 
   /** Start the tracker worker; rejects if it can't load (then the main thread runs MediaPipe). */
-  private startWorker(prefer: "GPU" | "CPU") {
+  private startWorker(prefer: "GPU" | "CPU", probe: boolean) {
     if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined")
       return Promise.reject(new Error("no worker support"));
     return new Promise<Worker>((resolve, reject) => {
@@ -208,7 +244,7 @@ export class CameraSource implements TrackingSource {
           resolve(worker);
         } else if (e.data.type === "error") fail(e.data.message);
       };
-      worker.postMessage({ type: "init", numHands: this.numHands, prefer } satisfies TrackerRequest);
+      worker.postMessage({ type: "init", numHands: this.numHands, prefer, probe } satisfies TrackerRequest);
     });
   }
 
@@ -221,8 +257,8 @@ export class CameraSource implements TrackingSource {
         runningMode: "VIDEO",
         numHands: this.numHands,
         minHandDetectionConfidence: 0.5,
-        minHandPresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+        minHandPresenceConfidence: 0.4,
+        minTrackingConfidence: 0.3,
       });
     if (prefer === "GPU") {
       try {
