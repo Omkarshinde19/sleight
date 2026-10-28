@@ -272,7 +272,7 @@ def drape():
                 continue
             face(bm, [grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]], up)
     # anaesthesia screen: drape hung from a bar across the table, hiding the head
-    bar_y = 1.48
+    bar_y = 1.3
     screen = [[bm.verts.new(B(SCREEN_X + 0.03 * math.sin(math.pi * k / 10), y, z)) for z in zs[2:-2]] for k, y in enumerate([skin_height(SCREEN_X, MID_Z) - 0.12 + (bar_y - skin_height(SCREEN_X, MID_Z) + 0.12) * k / 10 for k in range(11)])]
     for k in range(10):
         for j in range(len(screen[k]) - 1):
