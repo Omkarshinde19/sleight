@@ -63,6 +63,8 @@ export interface Grabbable {
   switchGroups?: boolean;
   /** Checked every step while held; true makes the hand let go (e.g. a chip clicking into its socket). */
   shouldRelease?: () => boolean;
+  /** Checked before picking up; false leaves it where it is (e.g. one surgical instrument at a time). */
+  canGrab?: () => boolean;
   onGrab?: (hand: Handedness) => void;
   /** May return a new velocity (e.g. aim assist). */
   onRelease?: (info: ReleaseInfo) => Point | void;
@@ -404,6 +406,7 @@ export function HandPhysics({ scale = 1.5, children }: { scale?: number; childre
         let bestD = Infinity;
         for (const item of registry.values()) {
           if (other.held?.item.id === item.id) continue;
+          if (item.canGrab && !item.canGrab()) continue;
           // grip-based items: a closing claw anywhere near the object takes it
           const wants = item.grip ? rt.grip >= item.grip.grab : gestureWindow && item.gestures.includes(g);
           if (!wants) continue;
