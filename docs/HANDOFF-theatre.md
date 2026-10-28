@@ -55,15 +55,17 @@ v3 plan: `docs/PLAN-v3.md`. Blender pipeline and hand contract: `docs/BLENDER.md
     `public/mediapipe/vision_bundle.mjs`, which `scripts/copy-mediapipe.mjs` copies; bundled workers
     break under Turbopack). Falls back to the main thread. Camera asks for 60 fps.
   - Poses stamped by capture time (`src/lib/tracking/frameClock.ts`) so motion doesn't step.
-  - Forearm hangs toward an elbow that follows the hand (`src/lib/hand/forearm.ts`, option B: below and
-    toward the viewer, 30 % hand blend); in scenes it grows until it leaves the screen; the landing page
-    puts the elbow behind the hand (`LANDING_ELBOW`).
+  - **Hands only (2026-10-28):** no forearm or elbow any more; the hand ends at a 5 cm wrist cuff in line
+    with the hand. Every hand is 1.6x smaller (theatre 0.75, arcade 0.94, industrial 0.875, landing 1.44).
+  - **Mouse camera in every scene:** right-drag looks around from where you stand (±60° sideways, ±40°
+    up/down), the wheel zooms (0.75–3x), "Reset view" restores it (`CameraRig`, `useView`). The simulated
+    hand ignores right-drags; its depth is R/F only.
   - Skeleton flip fix (`src/lib/hand/skeleton.ts`): fists no longer curl outwards after an early relabel.
   - The simulated hand (tests, demo autopilot) glides to `reach()` targets (0.18 s) and curls at 0.12 s.
 
 **Still open (not started unless the user asks):** Step 1.4 Poly Haven HDRI (needs download permission),
 1.5 Blender props, 1.6 landing animations, 1.7 perf budget in e2e, authored ball grip for arcade (the
-user picked it; not built yet), elbow IK in the rig (picked; current forearm is code-side), and all of
+user picked it; not built yet), and all of
 Step 2 (UI palette: **confirm colours with the user before writing any tokens**).
 
 ## The surgery room today (`src/scenes/theatre/`)
@@ -99,7 +101,8 @@ Blender-built operating room. Models and their contracts: `docs/BLENDER.md`.
 - The operating field sits low in camera C2: the cut rings and stitch dots are small. A "lean in"
   camera for steps 3–5 is a possible follow-up (not asked for). Industrial "fist can't pick up the
   microchip" flakes ~1 in 17 since the snappier smoothing.
-- On the landing page's scrolled "Machinist" chapter the forearm reads as a short stub (elbow behind).
+- With the smaller hands, a fist made right on the industrial microchip can flick it off the bench (the
+  e2e test now makes its fist 3 cm above the chip).
 - About 14 % of the left hand's tight-fist frames in the recorded session sit borderline (fingertip level
   with the knuckle); the raw tracker reads the same.
 - Nothing has been checked with the user's real webcam by you; they test it themselves and report.

@@ -41,7 +41,7 @@ Generated sources have a builder script beside the exporter, e.g.
 Built by `scripts/blender/build_hand.py`; pinned by `src/lib/assets/robotHand.test.ts`.
 
 - Armature `RobotHand`: 21 bones named after MediaPipe's landmarks (`WRIST`, `THUMB_CMC` …
-  `INDEX_FINGER_MCP` … `PINKY_TIP`) plus `FOREARM` (elbow → wrist, parent of `WRIST`). Finger roots
+  `INDEX_FINGER_MCP` … `PINKY_TIP`) plus `FOREARM` (a 5 cm wrist cuff behind the wrist, parent of `WRIST`; there is no forearm). Finger roots
   are children of `WRIST`. Bone *X* starts at landmark *X* and points at the next landmark; `*_TIP`
   bones are 12 mm nubs.
 - Rest pose (three.js axes): open right hand, wrist at the origin, fingers +Y, back of the hand +Z,
@@ -58,8 +58,8 @@ Each frame `HandRig` takes the same settled joints the physics colliders use. Th
 middle knuckle, +X toward the pinky, +Z back of the hand) orients the wrist; every other bone starts
 from its parent's orientation and swings, by the smallest rotation, to point at its child joint, so no
 bone twists on its own. Each bone stretches to the tracked bone length; thickness follows the hand
-scale. Bones are flattened under one root so stretching never shears children. The forearm is aimed
-by `ForearmFollower` and grows until it leaves the screen.
+scale. Bones are flattened under one root so stretching never shears children. The cuff carries on
+straight back from the knuckles through the wrist, at its modelled length.
 
 ## Marker empties
 
