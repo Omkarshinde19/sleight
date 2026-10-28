@@ -85,26 +85,39 @@ export function classifyInstant(f: HandFeatures, current: Gesture = "none"): Ges
 /**
  * Debounced classifier: a new gesture must win `dwellFrames` frames in a row before it takes over.
  * Combined with the enter/exit thresholds this keeps grabs from flickering.
+ *
+ * With `dwellSec` and frame times, it's a time instead: the gesture must win for that long (and at
+ * least two frames). Three frames is 66 ms at 30 fps but 230 ms at 13 fps, which held a ball so long
+ * after the fingers opened that the throw had already slowed down.
  */
 export class GestureClassifier {
   gesture: Gesture = "none";
   private candidate: Gesture = "none";
   private candidateFrames = 0;
+  private candidateSince = 0;
 
-  constructor(private dwellFrames = 3) {}
+  constructor(
+    private dwellFrames = 3,
+    private dwellSec: number | null = null,
+  ) {}
 
-  update(f: HandFeatures): Gesture {
+  update(f: HandFeatures, tSec?: number): Gesture {
     const next = classifyInstant(f, this.gesture);
     if (next === this.gesture) {
       this.candidateFrames = 0;
       return this.gesture;
     }
-    if (next === this.candidate) this.candidateFrames++;
+    if (next === this.candidate && this.candidateFrames > 0) this.candidateFrames++;
     else {
       this.candidate = next;
       this.candidateFrames = 1;
+      this.candidateSince = tSec ?? 0;
     }
-    if (this.candidateFrames >= this.dwellFrames) {
+    const won =
+      this.dwellSec !== null && tSec !== undefined
+        ? this.candidateFrames >= 2 && tSec - this.candidateSince >= this.dwellSec - 1e-6
+        : this.candidateFrames >= this.dwellFrames;
+    if (won) {
       this.gesture = next;
       this.candidateFrames = 0;
     }

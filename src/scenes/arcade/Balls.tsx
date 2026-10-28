@@ -39,7 +39,7 @@ export interface BallRuntime {
 export const balls: BallRuntime[] = SLOTS.map(() => ({ body: null, state: "rack", since: 0, trail: [], awaySince: null }));
 
 /** Arcade throw: hand speeds are small, so scale them up; z (depth) is the weakest signal, so most gain. */
-const THROW = { windowSec: 0.12, lookbackSec: 0.35, gain: { x: 2.2, y: 2.8, z: 3.4 }, maxSpeed: 13 };
+const THROW = { windowSec: 0.12, lookbackSec: 0.35, gain: { x: 2.2, y: 2.8, z: 3.4 }, maxSpeed: 13, minSamples: 4 };
 
 function Ball({ index, texture }: { index: number; texture: THREE.Texture }) {
   const rt = balls[index];
